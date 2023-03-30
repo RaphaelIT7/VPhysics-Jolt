@@ -3,57 +3,11 @@ name: Build Artifacts
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
-  windows:
-    strategy:
-      fail-fast: false
-      matrix:
-        source_branch: [sdk2013-sp, sdk2013-mp, asw]
-
-    runs-on: windows-2022
-
-    steps:
-    - name: Checkout Mini Source SDK
-      uses: actions/checkout@v3
-      with:
-        repository: Joshua-Ashton/mini-source-sdk
-
-    - name: Checkout VPhysics Jolt
-      uses: actions/checkout@v3
-      with:
-        path: ${{ matrix.source_branch }}/src/vphysics_jolt
-        submodules: recursive
-
-    - name: Find Visual Studio
-      run: |
-        $installationPath = Get-VSSetupInstance `
-          | Select-VSSetupInstance -Require Microsoft.VisualStudio.Workload.NativeDesktop -Latest `
-          | Select-Object -ExpandProperty InstallationPath
-        Write-Output "VSDEVCMD=${installationPath}\Common7\Tools\VsDevCmd.bat" `
-          | Out-File -FilePath "${Env:GITHUB_ENV}" -Append
-
-    - name: Build MSVC x86
-      working-directory: ${{ matrix.source_branch }}/src
-      run: |
-        & "${Env:COMSPEC}" /s /c "`"${Env:VSDEVCMD}`" -arch=x86 -host_arch=x64 -no_logo && set" `
-          | % { , ($_ -Split '=', 2) } `
-          | % { [System.Environment]::SetEnvironmentVariable($_[0], $_[1]) }
-        .\fix_registry.bat
-        .\createjoltprojects.bat
-        devenv jolt.sln /upgrade
-        msbuild jolt.sln /nodeReuse:false /t:Rebuild /p:Configuration=Release /p:Platform=x86 /m /v:minimal
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: vphysics_jolt_${{ matrix.source_branch }}_win32
-        path: ${{ matrix.source_branch }}/game
-        if-no-files-found: error
-
   linux:
     strategy:
       fail-fast: false
       matrix:
-        source_branch: [sdk2013-sp, sdk2013-mp]
+        source_branch: [sdk2013-mp]
 
     runs-on: ubuntu-latest
     container: debian:bullseye

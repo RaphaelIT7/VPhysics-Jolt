@@ -196,6 +196,7 @@ bool JoltPhysicsInterface::OnAssert( const char *inExpression, const char *inMes
 {
 	const char *message = inMessage ? inMessage : inExpression;
 	(void) message;
-	AssertMsg_Internal( false, inLine, inFile, message );
+	_AssertMsg( false, message, (void)0, false );
+	//AssertMsg_Internal( false, inLine, inFile, message );
 	return false;
 }

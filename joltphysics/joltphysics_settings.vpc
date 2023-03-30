@@ -24,6 +24,11 @@ $Configuration
 		$GCC_ExtraCompilerFlags			"$BASE -msse4.1 -msse4.2"						[$VOLT_SSE42]
 		$EnableEnhancedInstructionSet	"Streaming SIMD Extensions 2 (/arch:SSE2)"		[$WIN32 && $VOLT_SSE42]		// Source 2013 doesn't enable this by default
 		
+		// CPU feature macros, we may want to tune these before release.
+		$PreprocessorDefinitions		"$BASE;JPH_USE_SSE4_1"
+
+		$GCC_ExtraCompilerFlags			"$BASE -msse4.1"
+		
 		// Feature test stuff for the SSE 2 build
 		$EnableEnhancedInstructionSet	"Streaming SIMD Extensions 2 (/arch:SSE2)"		[$WIN32 && $VOLT_SSE2]		// Source 2013 doesn't enable this by default
 	}
