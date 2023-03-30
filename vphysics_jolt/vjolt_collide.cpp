@@ -215,7 +215,7 @@ int JoltPhysicsCollision::CollideWrite( char *pDest, CPhysCollide *pCollide, boo
 	return 0;
 }
 
-CPhysCollide *JoltPhysicsCollision::UnserializeCollide( const char *pBuffer, int size, int index )
+CPhysCollide *JoltPhysicsCollision::UnserializeCollide( char *pBuffer, int size, int index )
 {
 	Log_Stub( LOG_VJolt );
 	return nullptr;
@@ -746,7 +746,7 @@ int JoltPhysicsCollision::CreateDebugMesh( CPhysCollide const *pCollisionModel, 
 	for ( auto &shape : collector.mHits )
 	{
 		JPH::Shape::GetTrianglesContext ctx;
-		shape.GetTrianglesStart( ctx, JPH::AABox::sBiggest(), JPH::Vec3::sZero());
+		shape.GetTrianglesStart( ctx, JPH::AABox::sBiggest(), JPH::Vec3::sZero() );
 		for ( ;; )
 		{
 			int nSubShapeTriCount = shape.GetTrianglesNext( ctx, nRequestCount, reinterpret_cast<JPH::Float3*>( &pVerts[ nAccumTris * 3 ] ), nullptr /* materials */);
@@ -920,14 +920,14 @@ bool JoltPhysicsCollision::TraceBoxAA( const Ray_t &ray, const CPhysCollide *pCo
 
 //-------------------------------------------------------------------------------------------------
 
-void JoltPhysicsCollision::DuplicateAndScale( vcollide_t *pOut, const vcollide_t *pIn, const Vector &vecScale )
+void JoltPhysicsCollision::DuplicateAndScale( vcollide_t *pOut, const vcollide_t *pIn, float flScale )
 {
 	CPhysCollide **pSolids = new CPhysCollide * [pIn->solidCount];
 	for ( unsigned short i = 0; i < pIn->solidCount; i++ )
 	{
 		const JPH::Shape* pShape = pIn->solids[i]->ToShape();
 
-		pSolids[i] = CPhysCollide::FromShape( ToDanglingRef( pShape->ScaleShape( SourceToJolt::Unitless( vecScale ) ).Get() ) );
+		pSolids[i] = CPhysCollide::FromShape( ToDanglingRef( pShape->ScaleShape( JPH::Vec3::sReplicate( flScale ) ).Get() ) );
 	}
 
 	char *pKeyValues = new char[ pIn->descSize ];
