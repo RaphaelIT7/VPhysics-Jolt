@@ -580,7 +580,7 @@ static void CollideBoxVsShape( const Ray_t &ray, uint32 contentsMask, IConvexInf
 	JPH::BoxShape boxShape( halfExtent, kMaxConvexRadius );
 
 	JPH::CollideShapeSettings settings;
-	//settings.mMaxSeparationDistance = DIST_EPSILON;
+	settings.mMaxSeparationDistance = 0.0f;
 	//settings.mBackFaceMode = JPH::EBackFaceMode::CollideWithBackFaces;
 
 	ContentsCollector_CollideShape collector( pShape, contentsMask, pConvexInfo );
