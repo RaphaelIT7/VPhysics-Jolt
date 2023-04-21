@@ -9,7 +9,7 @@ jobs:
       matrix:
         source_branch: [sdk2013-mp]
 
-    runs-on: self-hosted
+    runs-on: windows-2022
 
     steps:
     - name: Checkout Mini Source SDK
