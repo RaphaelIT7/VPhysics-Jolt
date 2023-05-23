@@ -68,8 +68,7 @@ jobs:
     - name: Checkout Mini Source SDK
       uses: actions/checkout@v3
       with:
-        repository: RaphaelIT7/mini-source-sdk
-        ref: fixing-erros
+        repository: Joshua-Ashton/mini-source-sdk
 
     - name: Checkout VPhysics Jolt
       uses: actions/checkout@v3
