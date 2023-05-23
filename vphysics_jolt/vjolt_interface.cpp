@@ -119,6 +119,12 @@ void *JoltPhysicsInterface::QueryInterface( const char *pInterfaceName )
 	return factory( pInterfaceName, NULL );	
 }
 
+void* JoltPhysicsInterface::CreateInterface(const char* pInterfaceName)
+{
+	CreateInterfaceFn factory = Sys_GetFactoryThis();
+	return factory(pInterfaceName, NULL);
+}
+
 //-------------------------------------------------------------------------------------------------
 
 IPhysicsEnvironment *JoltPhysicsInterface::CreateEnvironment()
