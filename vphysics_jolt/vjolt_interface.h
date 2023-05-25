@@ -46,6 +46,7 @@ DECLARE_LOGGING_CHANNEL( LOG_VJolt );			// For our vphysics_jolt code
 DECLARE_LOGGING_CHANNEL( LOG_JoltInternal );	// For Jolt's traces/assertions. Do NOT use for our code.
 
 //-------------------------------------------------------------------------------------------------
+extern void *CreateInterface( const char* pInterfaceName );
 
 class JoltPhysicsCollisionSet final : public IPhysicsCollisionSet
 {
@@ -85,7 +86,6 @@ public:
 	InitReturnVal_t Init() override;
 	void Shutdown() override;
 	void *QueryInterface( const char *pInterfaceName ) override;
-	void *CreateInterface( const char* pInterfaceName );
 
 	IPhysicsEnvironment *CreateEnvironment() override;
 	void DestroyEnvironment( IPhysicsEnvironment *pEnvironment ) override;
