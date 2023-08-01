@@ -3,7 +3,7 @@
 #include <utlsymbol.h>
 #include <UtlStringMap.h>
 #include <KeyValues.h>
-#include "branch_overrides.h"
+#include "../vphysics_jolt/compat/branch_overrides.h"
 #include "vjolt_surfaceprops.h"
 
 class JoltPhysicsSurfaceProps_Bridge final : public IPhysicsSurfaceProps
