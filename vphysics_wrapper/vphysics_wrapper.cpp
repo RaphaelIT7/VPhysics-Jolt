@@ -53,8 +53,6 @@ private:
 PhysicsWrapper PhysicsWrapper::s_PhysicsInterface;
 EXPOSE_SINGLE_INTERFACE_GLOBALVAR( PhysicsWrapper, IPhysics, VPHYSICS_INTERFACE_VERSION, PhysicsWrapper::GetInstance() );
 
-EXPOSE_SINGLE_INTERFACE_GLOBALVAR(JoltPhysicsSurfaceProps_Bridge, IPhysicsSurfaceProps, VPHYSICS_SURFACEPROPS_INTERFACE_VERSION, JoltPhysicsSurfaceProps_Bridge::GetInstance());
-
 //-------------------------------------------------------------------------------------------------
 
 // Tries to load the actual vphysics DLL
