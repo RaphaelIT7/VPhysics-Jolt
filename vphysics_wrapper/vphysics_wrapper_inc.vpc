@@ -19,7 +19,8 @@ $Configuration
 		// For Alien Swarm, we don't get the ability to build our own tier1 or mathlib
 		// which means we need to be compatible with the .libs provided built for
 		// ancient Visual Studio.
-		$AdditionalDependencies			"$BASE legacy_stdio_definitions.lib" [$GAME_ASW]
+		$AdditionalDependencies			"$BASE legacy_stdio_definitions.lib;" [$GAME_ASW]
+		$AdditionalDependencies			"$BASE ../vphysics_jolt/Debug_AVX2/vjolt_surfaceprops.obj;"
 	}
 }
 
@@ -28,6 +29,11 @@ $Project "vphysics_wrapper"
 	$Folder	"Source Files"
 	{
 		$File	"vphysics_wrapper.cpp"
+		$File 	"vjolt_surfaceprops.h"
+		$File 	"vjolt_surfacepropsbridge.h"
+		$File 	"vjolt_surfacepropsbridge.cpp"
+		$File 	"vjolt_utils.h"
+		$File 	"vjolt_utils.cpp"
 	}
 
 	$Folder	"Header Files"
