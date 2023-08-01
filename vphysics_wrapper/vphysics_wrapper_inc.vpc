@@ -35,10 +35,8 @@ $Project "vphysics_wrapper"
 
 	$Folder	"Header Files"
 	{	
-		$File 	"branch_overrides.h"
-		$File 	"vjolt_utils.h"		
-		$File 	"vjolt_surfaceprops.h"
-		$File 	"vjolt_surfacepropsbridge.h"	
+		$File 	"vjolt_utils.h"
+		$File 	"vjolt_surfacepropsbridge.h"
 	}
 	
 	$Folder "Interface"

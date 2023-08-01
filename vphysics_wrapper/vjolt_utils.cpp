@@ -7,7 +7,7 @@
 #include <cpuid.h>
 #endif
 
-static void GetCPUID( int *pInfo, int func, int subfunc )
+void GetCPUID( int *pInfo, int func, int subfunc )
 {
 #ifdef _WIN32
 	__cpuidex( pInfo, func, subfunc );
@@ -16,7 +16,7 @@ static void GetCPUID( int *pInfo, int func, int subfunc )
 #endif
 }
 
-static CPULevel_t GetCPULevel()
+CPULevel_t GetCPULevel()
 {
 	int cpuInfo[4];
 	CPULevel_t cpuLevel = CPU_HAS_SSE2;
@@ -41,7 +41,7 @@ static CPULevel_t GetCPULevel()
 	return cpuLevel;
 }
 
-static const char *GetModuleFromCPULevel( CPULevel_t level )
+const char *GetModuleFromCPULevel( CPULevel_t level )
 {
 	switch ( level )
 	{
