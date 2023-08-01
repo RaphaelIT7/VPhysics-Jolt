@@ -86,8 +86,6 @@ public:
 	void Shutdown() override;
 	void *QueryInterface( const char *pInterfaceName ) override;
 
-	void *CreateInterface( const char* pInterfaceName );
-
 	IPhysicsEnvironment *CreateEnvironment() override;
 	void DestroyEnvironment( IPhysicsEnvironment *pEnvironment ) override;
 	IPhysicsEnvironment *GetActiveEnvironmentByIndex( int index ) override;

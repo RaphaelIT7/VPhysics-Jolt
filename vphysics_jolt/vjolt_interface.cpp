@@ -119,12 +119,6 @@ void *JoltPhysicsInterface::QueryInterface( const char *pInterfaceName )
 	return factory( pInterfaceName, NULL );	
 }
 
-void *JoltPhysicsInterface::CreateInterface(const char* pInterfaceName)
-{
-	CreateInterfaceFn factory = Sys_GetFactoryThis();
-	return factory(pInterfaceName, NULL);
-}
-
 //-------------------------------------------------------------------------------------------------
 
 IPhysicsEnvironment *JoltPhysicsInterface::CreateEnvironment()
@@ -202,7 +196,6 @@ bool JoltPhysicsInterface::OnAssert( const char *inExpression, const char *inMes
 {
 	const char *message = inMessage ? inMessage : inExpression;
 	(void) message;
-	_AssertMsg( false, message, (void)0, false );
-	//AssertMsg_Internal( false, inLine, inFile, message );
+	AssertMsg_Internal( false, inLine, inFile, message );
 	return false;
 }
