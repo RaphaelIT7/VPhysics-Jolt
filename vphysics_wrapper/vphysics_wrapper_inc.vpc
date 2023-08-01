@@ -29,15 +29,16 @@ $Project "vphysics_wrapper"
 	$Folder	"Source Files"
 	{
 		$File	"vphysics_wrapper.cpp"
-		$File 	"vjolt_surfaceprops.h"
-		$File 	"vjolt_surfacepropsbridge.h"
 		$File 	"vjolt_surfacepropsbridge.cpp"
-		$File 	"vjolt_utils.h"
 		$File 	"vjolt_utils.cpp"
 	}
 
 	$Folder	"Header Files"
-	{				
+	{	
+		$File 	"../vphysics_jolt/compat/branch_overrides.h"
+		$File 	"vjolt_utils.h"		
+		$File 	"vjolt_surfaceprops.h"
+		$File 	"vjolt_surfacepropsbridge.h"	
 	}
 	
 	$Folder "Interface"
