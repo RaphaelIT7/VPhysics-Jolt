@@ -21,6 +21,8 @@ $Configuration
 		// ancient Visual Studio.
 		$AdditionalDependencies			"$BASE legacy_stdio_definitions.lib;" [$GAME_ASW]
 		$AdditionalDependencies 		"$BASE vphysics_jolt_avx2.lib"
+		$AdditionalDependencies			"$BASE ../vphysics_jolt/Debug_AVX2/vjolt_surfaceprops.obj;" [$WIN32||$WIN64]
+		$AdditionalDependencies			"$BASE ../vphysics_jolt/Debug_AVX2/vjolt_surfaceprops.o;" [$LINUX32||$LINUX64]
 	}
 }
 
