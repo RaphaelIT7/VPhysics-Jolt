@@ -11,6 +11,7 @@
 //-------------------------------------------------------------------------------------------------
 
 static JoltConVar vjolt_player_collision_tolerance( "vjolt_player_collision_tolerance", "0.05" );
+static JoltConVar vjolt_player_downwards_force( "vjolt_player_downwards_force", "1" );
 
 //-------------------------------------------------------------------------------------------------
 
@@ -408,7 +409,7 @@ void JoltPhysicsPlayerController::OnPreSimulate( float flDeltaTime )
 	CheckCollision( m_pObject, collector, filter );
 	
 	// Source typically uses -0.7 for ground.
-	if ( collector.HadHit() && collector.m_flLowestNormalZ < -0.7f )
+	if ( collector.HadHit() && collector.m_flLowestNormalZ < -0.7f && vjolt_player_downwards_force.GetBool() )
 	{
 		JPH::BodyID otherID = collector.m_Hit.mBodyID2;
 
