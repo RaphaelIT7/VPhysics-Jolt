@@ -25,13 +25,13 @@
 #define JOLT_VERTEX_BUFFER_NAME		"Jolt Debug Renderer Vertices"
 #define JOLT_INDEX_BUFFER_NAME		"Jolt Debug Renderer Indices"
 
-static JoltConVar vjolt_debugrender( "vjolt_debugrender", "0", FCVAR_CHEAT );
+static ConVar vjolt_debugrender( "vjolt_debugrender", "0", FCVAR_CHEAT );
 #ifndef VJOLT_USE_PHYSICS_DEBUG_OVERLAY
-static JoltConVar vjolt_debugrender_picture_in_picture( "vjolt_debugrender_picture_in_picture", "1" );
-static JoltConVar vjolt_debugrender_clear_rt( "vjolt_debugrender_clear_rt", "1" );
-static JoltConVar vjolt_debugrender_clear_depth( "vjolt_debugrender_clear_depth", "1" );
-static JoltConVar vjolt_debugrender_wireframe( "vjolt_debugrender_wireframe", "0" );
-static JoltConVar vjolt_debugrender_color_mode( "vjolt_debugrender_color_mode", "instance", 0, "One of instance, shape_type, motion_type, sleep, island, material." );
+static ConVar vjolt_debugrender_picture_in_picture( "vjolt_debugrender_picture_in_picture", "1" );
+static ConVar vjolt_debugrender_clear_rt( "vjolt_debugrender_clear_rt", "1" );
+static ConVar vjolt_debugrender_clear_depth( "vjolt_debugrender_clear_depth", "1" );
+static ConVar vjolt_debugrender_wireframe( "vjolt_debugrender_wireframe", "0" );
+static ConVar vjolt_debugrender_color_mode( "vjolt_debugrender_color_mode", "instance", 0, "One of instance, shape_type, motion_type, sleep, island, material." );
 #endif
 
 //-------------------------------------------------------------------------------------------------

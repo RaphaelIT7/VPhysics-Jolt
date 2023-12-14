@@ -15,7 +15,8 @@ jobs:
     - name: Checkout Mini Source SDK
       uses: actions/checkout@v3
       with:
-        repository: Joshua-Ashton/mini-source-sdk
+        repository: RaphaelIT7/mini-source-sdk
+        ref: gmod-fixed-convars
 
     - name: Checkout VPhysics Jolt
       uses: actions/checkout@v3
@@ -68,7 +69,8 @@ jobs:
     - name: Checkout Mini Source SDK
       uses: actions/checkout@v3
       with:
-        repository: Joshua-Ashton/mini-source-sdk
+        repository: RaphaelIT7/mini-source-sdk
+        ref: gmod-fixed-convars
 
     - name: Checkout VPhysics Jolt
       uses: actions/checkout@v3
