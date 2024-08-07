@@ -190,6 +190,8 @@ public:
 	void SaveObjectState( JPH::StateRecorder &recorder );
 	void RestoreObjectState( JPH::StateRecorder &recorder );
 
+	void PostSimulation( float flTimestep );
+
 	unsigned short GetGameMaterial() const
 	{
 		return m_GameMaterial;
@@ -230,9 +232,10 @@ public:
 		m_pBody->SetLinearVelocity( realVelocity );
 	}
 
+	void UpdateLayer();
+	void RecomputeDrag();
 private:
 	void UpdateMaterialProperties();
-	void UpdateLayer();
 
 	// Josh:
 	// Always put m_pGameData first. Some games that will
@@ -258,12 +261,20 @@ private:
 	float m_flCachedInvMass = 0.0f;
 	bool m_bCachedCollisionEnabled = true;
 
+	bool m_bDragEnabled = false;
+	float m_flLinearDragCoefficient = 0.0f;
+	float m_flAngularDragCoefficient = 0.0f;
+
 	float m_flMaterialDensity = 1.0f; // Material density in Jolt space.
 	float m_flBuoyancyRatio = 0.0f;
 	float m_flVolume = 0.0f;
 
 	unsigned short m_GameMaterial = 0;
 
+	Vector m_vLastVelocity;
+	AngularImpulse m_vLastAngularVelocity;
+	Vector m_vLastPosition;
+	QAngle m_qLastOrientation;
 
 	CUtlVector< IJoltObjectDestroyedListener * > m_destroyedListeners;
 
