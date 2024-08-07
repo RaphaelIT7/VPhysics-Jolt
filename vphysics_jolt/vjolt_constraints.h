@@ -78,6 +78,7 @@ public:
 	void InitialiseSliding( IPhysicsConstraintGroup *pGroup, const constraint_slidingparams_t &sliding );
 	void InitialiseBallsocket( IPhysicsConstraintGroup *pGroup, const constraint_ballsocketparams_t &ballsocket );
 	void InitialiseFixed( IPhysicsConstraintGroup *pGroup, const constraint_fixedparams_t &fixed );
+	void InitialisePulley( IPhysicsConstraintGroup *pGroup, const constraint_pulleyparams_t &pulley );
 	void InitialiseLength( IPhysicsConstraintGroup *pGroup, const constraint_lengthparams_t &length );
 
 	void SaveConstraintSettings( JPH::StateRecorder &recorder );

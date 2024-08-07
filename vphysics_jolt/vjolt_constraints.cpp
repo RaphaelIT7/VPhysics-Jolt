@@ -540,6 +540,35 @@ void JoltPhysicsConstraint::InitialiseFixed( IPhysicsConstraintGroup *pGroup, co
 	m_pPhysicsSystem->AddConstraint( m_pConstraint );
 }
 
+
+//-------------------------------------------------------------------------------------------------
+// Pulley
+//-------------------------------------------------------------------------------------------------
+
+void JoltPhysicsConstraint::InitialisePulley( IPhysicsConstraintGroup *pGroup, const constraint_pulleyparams_t &pulley )
+{
+	SetGroup( pGroup );
+	m_ConstraintType = CONSTRAINT_PULLEY;
+
+	// Get our bodies
+	JPH::Body *refBody = m_pObjReference->GetBody();
+	JPH::Body *attBody = m_pObjAttached->GetBody();
+
+	JPH::PulleyConstraintSettings settings;
+	settings.mSpace = JPH::EConstraintSpace::LocalToBodyCOM;
+	settings.mFixedPoint1 = SourceToJolt::Distance( pulley.pulleyPosition[0] );
+	settings.mFixedPoint2 = SourceToJolt::Distance( pulley.pulleyPosition[1] );
+	settings.mBodyPoint1 = SourceToJolt::Distance( pulley.objectPosition[0] );
+	settings.mBodyPoint2 = SourceToJolt::Distance( pulley.objectPosition[1] );
+	settings.mRatio = pulley.gearRatio;
+	settings.mMaxLength = SourceToJolt::Distance( pulley.totalLength );
+
+	m_pConstraint = settings.Create( *refBody, *attBody );
+	m_pConstraint->SetEnabled( !pGroup && pulley.constraint.isActive );
+
+	m_pPhysicsSystem->AddConstraint( m_pConstraint );
+}
+
 //-------------------------------------------------------------------------------------------------
 // Length
 //-------------------------------------------------------------------------------------------------
