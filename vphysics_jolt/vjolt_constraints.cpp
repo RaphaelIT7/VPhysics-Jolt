@@ -14,6 +14,16 @@
 
 #include "vjolt_layers.h"
 
+#include "tier0/basetypes.h"
+#include "mathlib/mathlib.h"
+
+enum MatrixAxisType_t
+{
+	X_AXIS = 0,
+	Y_AXIS = 1,
+	Z_AXIS = 2,
+};
+
 //-------------------------------------------------------------------------------------------------
 
 static ConVar vjolt_constraint_velocity_substeps( "vjolt_constraint_velocity_substeps", "0" );
@@ -357,10 +367,10 @@ void JoltPhysicsConstraint::InitialiseRagdoll( IPhysicsConstraintGroup *pGroup, 
 		MatrixAxisType_t eAxis = *DOFBitToAxis( uDOFMask );
 
 		JPH::HingeConstraintSettings settings;
-		settings.mPoint1 = SourceToJolt::Distance( constraintToWorld.GetOrigin() );
-		settings.mPoint2 = SourceToJolt::Distance( constraintToWorld.GetOrigin() );
-		settings.mHingeAxis1 = SourceToJolt::Unitless( constraintToWorld.GetColumn( eAxis ) );
-		settings.mHingeAxis2 = SourceToJolt::Unitless( constraintToWorld.GetColumn( eAxis ) );
+		settings.mPoint1 = SourceToJolt::Distance( VMatrix(constraintToWorld).GetTranslation() );
+		settings.mPoint2 = SourceToJolt::Distance( VMatrix(constraintToWorld).GetTranslation() );
+		settings.mHingeAxis1 = SourceToJolt::Unitless( GetColumn( constraintToWorld, static_cast< JoltMatrixAxes >( eAxis ) ) );
+		settings.mHingeAxis2 = SourceToJolt::Unitless( GetColumn( constraintToWorld, static_cast< JoltMatrixAxes >( eAxis ) ) );
 		settings.mNormalAxis1 = HingePerpendicularVector( settings.mHingeAxis1 );
 		settings.mNormalAxis2 = HingePerpendicularVector( settings.mHingeAxis2 );
 		settings.mLimitsMin = limits.lAxisLimitsRad[ eAxis ].Min;

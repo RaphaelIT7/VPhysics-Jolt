@@ -106,11 +106,11 @@ void JoltPhysicsPlayerController::MaxSpeed( const Vector &velocity )
 	float flDot = DotProduct( vDirection, vCurrentVelocity );
 	if ( flDot > 0 )
 	{
-		m_vMaxSpeed = VectorAbs( velocity - ( vDirection * flDot * flLength ) );
+		VectorAbs( velocity - ( vDirection * flDot * flLength ), m_vMaxSpeed );
 	}
 	else
 	{
-		m_vMaxSpeed = VectorAbs( velocity );
+		VectorAbs( velocity, m_vMaxSpeed );
 	}
 }
 
@@ -213,7 +213,7 @@ bool JoltPhysicsPlayerController::OnContactValidate( const JPH::CharacterVirtual
 
 void JoltPhysicsPlayerController::OnContactAdded( const JPH::CharacterVirtual* inCharacter, const JPH::BodyID& inBodyID2, const JPH::SubShapeID& inSubShapeID2, JPH::RVec3Arg inContactPosition, JPH::Vec3Arg inContactNormal, JPH::CharacterContactSettings& ioSettings )
 {
-	JoltPhysicsContactListener *pListener = m_pObject->GetEnvironment()->GetContactListener();
+	//JoltPhysicsContactListener *pListener = m_pObject->GetEnvironment()->GetContactListener();
 }
 
 //-------------------------------------------------------------------------------------------------
