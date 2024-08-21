@@ -845,6 +845,16 @@ CPhysCollide *JoltPhysicsCollision::CreateVirtualMesh( const virtualmeshparams_t
 	 * > Final Crash: Type z = _mm_load_ss(&inV.z); 
 	 * > > ( Vec3::Vec3(float) ) - https://github.com/jrouwe/JoltPhysics/blob/master/Jolt/Math/Vec3.inl#L46
 	 * > Possible Cause: indexedTriangleList[xyz].m_Idx = Invalid vertex index?
+	 * 
+	 * StackTrace:
+	 * 0 - _mm_set_ss
+	 * 1 - _mm_load_ss
+	 * 2 - JPH::Vec3::Vec3 - Vec3.inl:56
+	 * 3 - JPH::TriangleCodecIndexed8BitPackSOA4Flags::ValidationContext::ValidationContext - TriangleCodecIndexed8BitPackSOA4Flags.h:102
+	 * 4 - JPH::MeshShapeSettings::Sanitize - MeshShape.cpp:96
+	 * 5 - JPH::MeshShapeSettings::MeshShapeSettings - MeshShape.cpp:88
+	 * 6 - JoltPhysicsCollision::CreateVirtualMesh - vjolt_collide.cpp:865
+	 * 7 - CM_CreateDispPhysCollide - engine_srv.so
 	 */
 
 	int idx = 0;
