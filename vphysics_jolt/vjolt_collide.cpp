@@ -15,7 +15,7 @@
 //-------------------------------------------------------------------------------------------------
 
 // Also in vjolt_collide_trace.cpp, should unify or just remove entirely
-static float kMaxConvexRadius = SourceToJolt::Distance( DIST_EPSILON * 2.0f );
+static constexpr float kMaxConvexRadius = JPH::cDefaultConvexRadius;
 
 JoltPhysicsCollision JoltPhysicsCollision::s_PhysicsCollision;
 EXPOSE_SINGLE_INTERFACE_GLOBALVAR( JoltPhysicsCollision, IPhysicsCollision, VPHYSICS_COLLISION_INTERFACE_VERSION, JoltPhysicsCollision::GetInstance() );
@@ -836,6 +836,11 @@ CPhysCollide *JoltPhysicsCollision::CreateVirtualMesh( const virtualmeshparams_t
 		indexedTriangleList[i*2+1].mIdx[2] = meshList.indices[i*3+0];
 		indexedTriangleList[i*2+1].mIdx[1] = meshList.indices[i*3+1];
 		indexedTriangleList[i*2+1].mIdx[0] = meshList.indices[i*3+2];
+	}
+
+	for ( JPH::IndexedTriangle trangle : indexedTriangleList )
+	{
+
 	}
 
 	JPH::MeshShapeSettings settings( vertexList, indexedTriangleList );
