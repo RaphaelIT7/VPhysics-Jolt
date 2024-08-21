@@ -851,13 +851,13 @@ CPhysCollide *JoltPhysicsCollision::CreateVirtualMesh( const virtualmeshparams_t
 	for ( JPH::IndexedTriangle triangle : indexedTriangleList )
 	{ 
 		if (triangle.mIdx[0] >= vertexList.size())
-			Warning("About to crash 1 (%i, %i, %i)\n", idx, indexedTriangleList.size(), vertexList.size());
+			Warning("About to crash 1 (%i, %i, %i, %lu)\n", idx, indexedTriangleList.size(), vertexList.size(), (unsigned long)triangle.mIdx[0]);
 
 		if (triangle.mIdx[1] >= vertexList.size())
-			Warning("About to crash 2 (%i, %i, %i)\n", idx, indexedTriangleList.size(), vertexList.size());
+			Warning("About to crash 2 (%i, %i, %i, %lu)\n", idx, indexedTriangleList.size(), vertexList.size(), (unsigned long)triangle.mIdx[1]);
 
 		if (triangle.mIdx[2] >= vertexList.size())
-			Warning("About to crash 3 (%i, %i, %i)\n", idx, indexedTriangleList.size(), vertexList.size());
+			Warning("About to crash 3 (%i, %i, %i, %lu)\n", idx, indexedTriangleList.size(), vertexList.size(), (unsigned long)triangle.mIdx[2]);
 
 		++idx;
 	}
