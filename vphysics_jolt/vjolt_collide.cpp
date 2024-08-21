@@ -838,9 +838,28 @@ CPhysCollide *JoltPhysicsCollision::CreateVirtualMesh( const virtualmeshparams_t
 		indexedTriangleList[i*2+1].mIdx[0] = meshList.indices[i*3+2];
 	}
 
-	for ( JPH::IndexedTriangle trangle : indexedTriangleList )
-	{
+	/*
+	 * Currently, there is a servercrash which is caused by Jolt trying to use vertecies that don't seem to exist?
+	 * > Crash Cause: mBounds.Encapsulate(Vec3(inVertices[idx])); 
+	 * > > https://github.com/jrouwe/JoltPhysics/blob/master/Jolt/AABBTree/TriangleCodec/TriangleCodecIndexed8BitPackSOA4Flags.h#L102
+	 * > Final Crash: Type z = _mm_load_ss(&inV.z); 
+	 * > > ( Vec3::Vec3(float) ) - https://github.com/jrouwe/JoltPhysics/blob/master/Jolt/Math/Vec3.inl#L46
+	 * > Possible Cause: indexedTriangleList[xyz].m_Idx = Invalid vertex index?
+	 */
 
+	int idx = 0;
+	for ( JPH::IndexedTriangle triangle : indexedTriangleList )
+	{ 
+		if (triangle.mIdx[0] >= vertexList.size())
+			Warning("About to crash 1 (%i, %i, %i)\n", idx, indexedTriangleList.size(), vertexList.size());
+
+		if (triangle.mIdx[1] >= vertexList.size())
+			Warning("About to crash 2 (%i, %i, %i)\n", idx, indexedTriangleList.size(), vertexList.size());
+
+		if (triangle.mIdx[2] >= vertexList.size())
+			Warning("About to crash 3 (%i, %i, %i)\n", idx, indexedTriangleList.size(), vertexList.size());
+
+		++idx;
 	}
 
 	JPH::MeshShapeSettings settings( vertexList, indexedTriangleList );
