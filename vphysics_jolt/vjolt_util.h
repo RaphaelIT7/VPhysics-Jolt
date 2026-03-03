@@ -210,6 +210,9 @@ namespace SourceToJolt
 	loam_expr float			AngularImpulse( float value )			{ return Angle( value ); }
 	loam_expr JPH::Vec3		AngularImpulse( Vector value )			{ return JPH::Vec3( AngularImpulse( value[0] ), AngularImpulse( value[1] ), AngularImpulse( value[2] ) ); }
 
+	// Converts torque from Source units (kg*in^2/s^2) to Jolt N*m (kg*m^2/s^2).
+	loam_expr float			Torque( float value )					{ return value * Factor * Factor; }
+
 	// Misc. AABB helpers.
 	loam_expr JPH::Vec3		AABBCenter( Vector mins, Vector maxs )			{ return Distance( mins + VectorHalfExtent( mins, maxs ) ); }
 	loam_expr JPH::Vec3		AABBHalfExtent( Vector mins, Vector maxs )		{ return Distance( VectorHalfExtent( mins, maxs ) ); }
