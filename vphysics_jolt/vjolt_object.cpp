@@ -1432,9 +1432,18 @@ IPhysicsEnvironment *JoltPhysicsObject::GetEnvironment()
 // This is needed since Jolt cannot guarantee perfectly fixed constraints - they could always move/rotate a bit which we don't want.
 void JoltPhysicsObject::RecaulculateFixedConstraintPartnerMovable()
 {
+	// Reset our own constraint-pinned state; we'll re-evaluate below.
+	m_bConstraintPinned = false;
+
 	for (JPH::Constraint *constraint : m_pPhysicsSystem->GetConstraints())
 	{
 		if ( constraint->GetType() != JPH::EConstraintType::TwoBodyConstraint )
+			continue;
+
+		// Only apply the fixed-constraint optimisation to FixedConstraint (weld).
+		// Other constraint types (hinge, rope, ballsocket, etc.) must never force
+		// the dynamic partner to Static -- that would freeze it in place.
+		if ( constraint->GetSubType() != JPH::EConstraintSubType::Fixed )
 			continue;
 
 		JPH::TwoBodyConstraint *twoBody = static_cast<JPH::TwoBodyConstraint*>( constraint );
@@ -1446,17 +1455,20 @@ void JoltPhysicsObject::RecaulculateFixedConstraintPartnerMovable()
 
 		if ( pObject )
 		{
-			if ( ( IsMoveable() && !pObject->IsMoveable() ) || ( !IsMoveable() && pObject->IsMoveable() ) )
+			// Only pin BOTH sides when BOTH are already non-moveable (e.g. two frozen props welded
+			// together). If one side is dynamic, leave it dynamic so it can still be simulated.
+			const bool bothNonMoveable = !IsMoveable() && !pObject->IsMoveable();
+			if ( bothNonMoveable )
 			{
 				m_bConstraintPinned = true;
 				pObject->m_bConstraintPinned = true;
 			}
 			else
 			{
-				m_bConstraintPinned = false;
+				// Dynamic partner must stay dynamic -- do not set ConstraintPinned.
 				pObject->m_bConstraintPinned = false;
 			}
-			pObject->UpdateLayer(); // RaphaelIT7: Since m_bConstraintPinned may have changed, we gotta ensure it also updates
+			pObject->UpdateLayer();
 		}
 	}
 }
