@@ -333,8 +333,8 @@ IPhysicsObject *JoltPhysicsEnvironment::CreatePolyObject( const CPhysCollide *pC
 	settings.mMassPropertiesOverride.mMass = params.mass;
 	//settings.mMassPropertiesOverride.mInertia = JPH::Mat44::sIdentity() * params.inertia;
 	settings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia; // JPH::EOverrideMassProperties::MassAndInertiaProvided;
-	settings.mMaxLinearVelocity = MaxVelocity();
-	settings.mMaxAngularVelocity = MaxAngularVelocity();
+	settings.mMaxLinearVelocity = SourceToJolt::Distance( MaxVelocity() );
+	settings.mMaxAngularVelocity = DEG2RAD( MaxAngularVelocity() );
 
 	if ( m_bUseLinearCast )
 		settings.mMotionQuality = JPH::EMotionQuality::LinearCast;
@@ -392,8 +392,8 @@ IPhysicsObject *JoltPhysicsEnvironment::CreateSphereObject( float radius, int ma
 		settings.mMassPropertiesOverride.mMass = params.mass;
 		//settings.mMassPropertiesOverride.mInertia = JPH::Mat44::sIdentity() * params.inertia;
 		settings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;//JPH::EOverrideMassProperties::MassAndInertiaProvided;
-		settings.mMaxLinearVelocity = MaxVelocity();
-		settings.mMaxAngularVelocity = MaxAngularVelocity();
+		settings.mMaxLinearVelocity = SourceToJolt::Distance( MaxVelocity() );
+		settings.mMaxAngularVelocity = DEG2RAD( MaxAngularVelocity() );
 	}
 
 	JPH::BodyInterface &bodyInterface = m_PhysicsSystem.GetBodyInterfaceNoLock();
@@ -1276,8 +1276,8 @@ void JoltPhysicsEnvironment::SetPerformanceSettings( const physics_performancepa
 
 			if ( pMotionProperties )
 			{
-				pMotionProperties->SetMaxLinearVelocity( pSettings->maxVelocity );
-				pMotionProperties->SetMaxAngularVelocity( pSettings->maxAngularVelocity * M_PI_F / 180 );
+				pMotionProperties->SetMaxLinearVelocity( SourceToJolt::Distance( pSettings->maxVelocity ) );
+				pMotionProperties->SetMaxAngularVelocity( DEG2RAD( pSettings->maxAngularVelocity ) );
 			}
 		}
 	}

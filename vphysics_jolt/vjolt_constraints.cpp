@@ -189,8 +189,11 @@ void JoltPhysicsConstraint::SetAngularMotor( float rotSpeed, float maxAngularImp
 	if ( !m_pConstraint )
 		return;
 
+	// rotSpeed is in deg/s -> rad/s
 	rotSpeed = DEG2RAD( rotSpeed );
-	maxAngularImpulse = DEG2RAD( maxAngularImpulse );
+	// maxAngularImpulse is a torque/impulse limit in Source units (kg*in^2/s^2 -> N*m = kg*m^2/s^2)
+	// NOT an angle, so DEG2RAD is wrong here. Use squared distance factor.
+	maxAngularImpulse = maxAngularImpulse * SourceToJolt::Factor * SourceToJolt::Factor;
 
 	switch ( m_ConstraintType )
 	{
@@ -375,7 +378,7 @@ void JoltPhysicsConstraint::InitialiseRagdoll( IPhysicsConstraintGroup *pGroup, 
 		settings.mNormalAxis2 = HingePerpendicularVector( settings.mHingeAxis2 );
 		settings.mLimitsMin = limits.lAxisLimitsRad[ eAxis ].Min;
 		settings.mLimitsMax = limits.lAxisLimitsRad[ eAxis ].Max;
-		settings.mMaxFrictionTorque = Max( flMinTorqueFriction, ragdoll.axes[ eAxis ].torque );
+		settings.mMaxFrictionTorque = Max( flMinTorqueFriction, ragdoll.axes[ eAxis ].torque * SourceToJolt::Factor * SourceToJolt::Factor );
 		
 		pConstraint = settings.Create( *pRefBody, *pAttBody );
 	}
@@ -398,7 +401,7 @@ void JoltPhysicsConstraint::InitialiseRagdoll( IPhysicsConstraintGroup *pGroup, 
 		settings.mTwistAxis2 = constraintToAttached.GetAxisX();
 		settings.mPlaneAxis2 = constraintToAttached.GetAxisY();
 
-		settings.mMaxFrictionTorque = Max( flMinTorqueFriction, ( ragdoll.axes[0].torque + ragdoll.axes[1].torque + ragdoll.axes[2].torque ) / 3.0f );
+		settings.mMaxFrictionTorque = Max( flMinTorqueFriction, ( ragdoll.axes[0].torque + ragdoll.axes[1].torque + ragdoll.axes[2].torque ) / 3.0f * SourceToJolt::Factor * SourceToJolt::Factor );
 
 		pConstraint = settings.Create( *pRefBody, *pAttBody );
 	}
@@ -444,8 +447,8 @@ void JoltPhysicsConstraint::InitialiseHinge( IPhysicsConstraintGroup *pGroup, co
 		settings.mLimitsMax = DEG2RAD( -hinge.hingeAxis.minRotation );
 	}
 
-	// TODO(Josh): Fix this... I have no idea what this should be.
-	//settings.mMaxFrictionTorque = hinge.hingeAxis.torque;
+	// Source torque is kg*in^2/s^2; Jolt expects N*m = kg*m^2/s^2. Convert with squared distance factor.
+	settings.mMaxFrictionTorque = hinge.hingeAxis.torque * SourceToJolt::Factor * SourceToJolt::Factor;
 
 	m_pConstraint = settings.Create( *refBody, *attBody );
 	m_pConstraint->SetEnabled( !pGroup && hinge.constraint.isActive );

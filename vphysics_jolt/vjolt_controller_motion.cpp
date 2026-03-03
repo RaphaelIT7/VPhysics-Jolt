@@ -114,14 +114,17 @@ void JoltPhysicsMotionController::OnPreSimulate( float flDeltaTime )
 		QAngle qObjectAngles;
 		pObject->GetPosition( nullptr, &qObjectAngles );
 
-		// vecLocalAngularVelocity is always local space.
-		Vector vecWorldAngularVelocity;
-		pObject->LocalToWorldVector( &vecWorldAngularVelocity, vecLocalAngularVelocity );
-
+		// For LOCAL cases: linear velocity must be rotated to world space.
+		// Angular velocity from Simulate() is ALWAYS in local object space per IVP contract,
+		// and must be rotated to world space before being applied to Jolt (which uses world-space ang vel).
+		// For GLOBAL cases: linear is already world space; angular is also world space.
 		Vector vecWorldVelocity = vecVelocity;
+		Vector vecWorldAngularVelocity = vecLocalAngularVelocity;
+
 		if ( simResult == IMotionEvent::SIM_LOCAL_ACCELERATION || simResult == IMotionEvent::SIM_LOCAL_FORCE )
 		{
 			pObject->LocalToWorldVector( &vecWorldVelocity, vecVelocity );
+			pObject->LocalToWorldVector( &vecWorldAngularVelocity, vecLocalAngularVelocity );
 		}
 
 		switch ( simResult )
