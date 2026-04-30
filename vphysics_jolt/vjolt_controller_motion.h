@@ -27,7 +27,7 @@ public:
 	void OnPreSimulate( float flDeltaTime ) override;
 
 private:
-	IMotionEvent *m_pMotionEvent;
+	IMotionEvent *m_pMotionEvent = nullptr;
 
 	std::vector< JoltPhysicsObject * > m_pObjects;
 };

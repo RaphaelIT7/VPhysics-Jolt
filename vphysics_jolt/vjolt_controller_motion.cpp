@@ -6,6 +6,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+static ConVar vjolt_motion_debug( "vjolt_motion_debug", "0", FCVAR_NONE, "Log motion controller (physgun etc) values." );
+
 //-------------------------------------------------------------------------------------------------
 
 JoltPhysicsMotionController::JoltPhysicsMotionController( IMotionEvent *pHandler )
@@ -96,64 +98,62 @@ void JoltPhysicsMotionController::OnPreSimulate( float flDeltaTime )
 	for ( JoltPhysicsObject *pObject : m_pObjects )
 	{
 		if ( !pObject->IsMoveable() )
-			return;
+			continue;
 
-		Vector vecVelocity = vec3_origin;
-		Vector vecLocalAngularVelocity = vec3_origin;
-		IMotionEvent::simresult_e simResult = m_pMotionEvent->Simulate( this, pObject, flDeltaTime, vecVelocity, vecLocalAngularVelocity );
+		Vector speed = vec3_origin;
+		AngularImpulse rot = vec3_origin;
+		IMotionEvent::simresult_e simResult = m_pMotionEvent->Simulate( this, pObject, flDeltaTime, speed, rot );
 
-		vecVelocity *= flDeltaTime;
-		vecLocalAngularVelocity *= flDeltaTime;
+		if ( vjolt_motion_debug.GetBool() )
+		{
+			Log_Msg( LOG_VJolt, "Motion ctrl: result=%d lin=(%.1f,%.1f,%.1f) |lin|=%.1f ang=(%.1f,%.1f,%.1f) |ang|=%.1f dt=%.4f\n",
+				int( simResult ),
+				speed.x, speed.y, speed.z, speed.Length(),
+				rot.x, rot.y, rot.z, rot.Length(),
+				flDeltaTime );
+		}
 
-		// GLOBAL/LOCAL refer to the coordinate system of vecVelocity's values.
-		// ACCELERATION/FORCE determine whether or not mass is divided out.
-		// 
-		// vecLocalAngularVelocity from Simulate is always in given local space, regardless.
-		// We must convert it to global space for it to be applied correctly.
-
-		QAngle qObjectAngles;
-		pObject->GetPosition( nullptr, &qObjectAngles );
-
-		// For LOCAL cases: linear velocity must be rotated to world space.
-		// Angular velocity from Simulate() is ALWAYS in local object space per IVP contract,
-		// and must be rotated to world space before being applied to Jolt (which uses world-space ang vel).
-		// For GLOBAL cases: linear is already world space; angular is also world space.
-		Vector vecWorldVelocity = vecVelocity;
-		Vector vecWorldAngularVelocity = vecLocalAngularVelocity;
+		// Per IVP contract, the angular component is always in object-local (core)
+		// space regardless of the LOCAL/GLOBAL flag - the flag governs only the
+		// linear component. Jolt body angular velocity is in world space, so we
+		// always need to rotate the angular value into world space before applying.
+		Vector worldLinear = speed;
+		AngularImpulse worldAngular;
+		pObject->LocalToWorldVector( &worldAngular, rot );
 
 		if ( simResult == IMotionEvent::SIM_LOCAL_ACCELERATION || simResult == IMotionEvent::SIM_LOCAL_FORCE )
-		{
-			pObject->LocalToWorldVector( &vecWorldVelocity, vecVelocity );
-			pObject->LocalToWorldVector( &vecWorldAngularVelocity, vecLocalAngularVelocity );
-		}
+			pObject->LocalToWorldVector( &worldLinear, speed );
 
 		switch ( simResult )
 		{
 			case IMotionEvent::SIM_NOTHING:
-			{
 				break;
-			}
 
-			case IMotionEvent::SIM_GLOBAL_ACCELERATION:
 			case IMotionEvent::SIM_LOCAL_ACCELERATION:
+			case IMotionEvent::SIM_GLOBAL_ACCELERATION:
 			{
-				pObject->AddVelocity( &vecWorldVelocity, &vecWorldAngularVelocity );
+				// IVP: pCore->speed += accel * dt; pCore->rot_speed += rot_accel * dt.
+				Vector deltaVel = worldLinear * flDeltaTime;
+				AngularImpulse deltaAng = worldAngular * flDeltaTime;
+				pObject->AddVelocity( &deltaVel, &deltaAng );
 				break;
 			}
 
-			case IMotionEvent::SIM_GLOBAL_FORCE:
 			case IMotionEvent::SIM_LOCAL_FORCE:
+			case IMotionEvent::SIM_GLOBAL_FORCE:
 			{
-				pObject->ApplyForceCenter( vecWorldVelocity );
-				pObject->ApplyTorqueCenter( vecWorldAngularVelocity );
+				// IVP: center_push divides force*dt by mass; rot_push by inertia.
+				// Jolt's AddImpulse / AddAngularImpulse do the same.
+				Vector linearImpulse = worldLinear * flDeltaTime;
+				AngularImpulse angularImpulse = worldAngular * flDeltaTime;
+				pObject->ApplyForceCenter( linearImpulse );
+				pObject->ApplyTorqueCenter( angularImpulse );
 				break;
 			}
 
 			default:
-			{
 				Log_Warning( LOG_VJolt, "Invalid motion event\n" );
 				break;
-			}
 		}
 	}
 }

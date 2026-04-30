@@ -19,6 +19,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+static ConVar vjolt_object_debug( "vjolt_object_debug", "0", FCVAR_NONE, "Log direct velocity/force API calls on physics objects." );
+
 //-------------------------------------------------------------------------------------------------
 
 #if GAME_GMOD
@@ -537,6 +539,15 @@ Vector JoltPhysicsObject::GetMassCenterLocalSpace() const
 
 void JoltPhysicsObject::SetPosition( const Vector &worldPosition, const QAngle &angles, bool isTeleport )
 {
+	if ( vjolt_object_debug.GetBool() )
+	{
+		Vector currentPos;
+		GetPosition( &currentPos, nullptr );
+		Vector delta = worldPosition - currentPos;
+		Log_Msg( LOG_VJolt, "SetPosition: target=(%.1f,%.1f,%.1f) delta=%.2f teleport=%d\n",
+			worldPosition.x, worldPosition.y, worldPosition.z, delta.Length(), int( isTeleport ) );
+	}
+
 	JPH::Vec3 joltPosition = SourceToJolt::Distance( worldPosition );
 	JPH::Quat joltRotation = SourceToJolt::Angle( angles );
 
@@ -583,6 +594,15 @@ void JoltPhysicsObject::GetPositionMatrix( matrix3x4_t *positionMatrix ) const
 
 void JoltPhysicsObject::SetVelocity( const Vector *velocity, const AngularImpulse *angularVelocity )
 {
+	if ( vjolt_object_debug.GetBool() )
+	{
+		Log_Msg( LOG_VJolt, "SetVelocity: v=%s(%.1f,%.1f,%.1f) w=%s(%.1f,%.1f,%.1f)\n",
+			velocity ? "" : "NULL ",
+			velocity ? velocity->x : 0.0f, velocity ? velocity->y : 0.0f, velocity ? velocity->z : 0.0f,
+			angularVelocity ? "" : "NULL ",
+			angularVelocity ? angularVelocity->x : 0.0f, angularVelocity ? angularVelocity->y : 0.0f, angularVelocity ? angularVelocity->z : 0.0f );
+	}
+
 	JPH::Vec3 joltLinearVelocity = velocity ? SourceToJolt::Distance( *velocity ) : JPH::Vec3{};
 	JPH::Vec3 joltAngularVelocity = angularVelocity ? SourceToJolt::AngularImpulse( *angularVelocity ) : JPH::Vec3{};
 
@@ -626,6 +646,11 @@ void JoltPhysicsObject::AddVelocity( const Vector *velocity, const AngularImpuls
 {
 	if ( !IsMoveable() )
 		return;
+
+	if ( vjolt_object_debug.GetBool() )
+		Log_Msg( LOG_VJolt, "AddVelocity: |v|=%.1f |w|=%.1f\n",
+			velocity ? velocity->Length() : 0.0f,
+			angularVelocity ? angularVelocity->Length() : 0.0f );
 
 	// Do this longer method do set velocity and angular velocity
 	// in the same lock.
@@ -704,6 +729,9 @@ void JoltPhysicsObject::ApplyForceCenter( const Vector &forceVector )
 	if ( !IsMoveable() )
 		return;
 
+	if ( vjolt_object_debug.GetBool() )
+		Log_Msg( LOG_VJolt, "ApplyForceCenter: |F|=%.1f mass=%.1f\n", forceVector.Length(), GetMass() );
+
 	JPH::BodyInterface &bodyInterface = m_pPhysicsSystem->GetBodyInterfaceNoLock();
 	bodyInterface.AddImpulse( m_pBody->GetID(), SourceToJolt::Distance( forceVector ) );
 }
@@ -712,6 +740,9 @@ void JoltPhysicsObject::ApplyForceOffset( const Vector &forceVector, const Vecto
 {
 	if ( !IsMoveable() )
 		return;
+
+	if ( vjolt_object_debug.GetBool() )
+		Log_Msg( LOG_VJolt, "ApplyForceOffset: |F|=%.1f mass=%.1f\n", forceVector.Length(), GetMass() );
 
 	JPH::Vec3 impulse = SourceToJolt::Distance( forceVector );
 	JPH::Vec3 point = SourceToJolt::Distance( worldPosition );
@@ -724,6 +755,9 @@ void JoltPhysicsObject::ApplyTorqueCenter( const AngularImpulse &torque )
 {
 	if ( !IsMoveable() )
 		return;
+
+	if ( vjolt_object_debug.GetBool() )
+		Log_Msg( LOG_VJolt, "ApplyTorqueCenter: |T|=%.1f\n", torque.Length() );
 
 	// Do this longer method do set velocity and angular velocity
 	// in the same lock.

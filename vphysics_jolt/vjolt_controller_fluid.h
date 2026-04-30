@@ -29,10 +29,10 @@ private:
 	cplane_t GetSurfacePlane() const;
 	void ClearCachedObjectsInShape();
 
-	JPH::PhysicsSystem *				m_pPhysicsSystem;
-	JoltPhysicsObject *					m_pFluidObject;
+	JPH::PhysicsSystem *				m_pPhysicsSystem = nullptr;
+	JoltPhysicsObject *					m_pFluidObject = nullptr;
 	std::vector<JoltPhysicsObject *>	m_ObjectsInShape;
 
-	fluidparams_t						m_Params;
-	cplane_t							m_LocalPlane;
+	fluidparams_t						m_Params = {};
+	cplane_t							m_LocalPlane = {};
 };

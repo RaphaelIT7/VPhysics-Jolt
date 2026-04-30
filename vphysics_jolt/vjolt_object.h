@@ -291,10 +291,10 @@ private:
 
 	unsigned short m_GameMaterial = 0;
 
-	Vector m_vLastVelocity;
-	AngularImpulse m_vLastAngularVelocity;
-	Vector m_vLastPosition;
-	QAngle m_qLastOrientation;
+	Vector m_vLastVelocity = vec3_origin;
+	AngularImpulse m_vLastAngularVelocity = vec3_origin;
+	Vector m_vLastPosition = vec3_origin;
+	QAngle m_qLastOrientation = vec3_angle;
 
 	CUtlVector< IJoltObjectDestroyedListener * > m_destroyedListeners;
 
