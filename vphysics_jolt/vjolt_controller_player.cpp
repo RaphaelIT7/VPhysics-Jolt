@@ -454,7 +454,7 @@ void JoltPhysicsPlayerController::OnPostSimulate( float flDeltaTime )
 	// Calculate effective velocity
 	Vector vNewPosition = JoltToSource::Distance( m_pCharacter->GetPosition() );
 	Vector vNewVelocity = ( vNewPosition - m_vOldPosition ) / flDeltaTime;
-	AngularImpulse vAngularImpulse;
+	AngularImpulse vAngularImpulse = vec3_origin;
 
 	m_pObject->SetPosition( vNewPosition, QAngle(), false );
 	m_pObject->SetVelocity( &vNewVelocity, &vAngularImpulse );
