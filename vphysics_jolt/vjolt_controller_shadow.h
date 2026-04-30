@@ -53,12 +53,5 @@ private:
 
 	uint16 m_savedMaterialIndex = 0;
 	uint16 m_savedCallbackFlags = 0;
-
-	float m_savedInvMass = 0.0f;
-	JPH::Vec3 m_savedInvInertiaDiagonal = JPH::Vec3::sZero();
-	JPH::Quat m_savedInertiaRotation = JPH::Quat::sIdentity();
-	float m_savedGravityFactor = 1.0f;
-	float m_savedLinearDamping = 0.0f;
-	float m_savedAngularDamping = 0.0f;
-	bool m_motionPropertiesSaved = false;
+	JPH::EMotionType m_savedMotionType = JPH::EMotionType::Dynamic;
 };
