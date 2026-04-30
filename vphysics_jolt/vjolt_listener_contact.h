@@ -318,18 +318,32 @@ public:
 			return;
 
 		// Send PreCollision events
-		// 
+		//
 		// Don't clear the collision events the first time around as we have
 		// the post-collisde event to send too!
 		m_CollisionEvents.ForEach< false >( [ this ]( JoltPhysicsCollisionEvent& event )
 		{
+			JoltPhysicsObject *pObj1 = event.m_Data.GetPair().pObject1;
+			JoltPhysicsObject *pObj2 = event.m_Data.GetPair().pObject2;
+
+			// Compute collisionSpeed from the post-resolution body velocities (matches
+			// IVP's contact->speed semantics: relative velocity at the contact surface
+			// after impulses have been applied). Reading pre-solver velocity here would
+			// over-report the impact for any externally-driven body (e.g. physgun-held
+			// props), causing spurious camera shake on sustained contact.
+			Vector vel1, vel2, normal;
+			pObj1->GetVelocity( &vel1, nullptr );
+			pObj2->GetVelocity( &vel2, nullptr );
+			event.m_Data.GetSurfaceNormal( normal );
+			event.m_Event.collisionSpeed = fabsf( ( vel1 - vel2 ).Dot( normal ) );
+
 			// Fake the velocities for the objects during the PreCollision callback so
 			// we get a proper delta velocity between Pre/Post for damage callbacks to work.
-			JPH::Vec3 object1Vel = event.m_Data.GetPair().pObject1->FakeJoltLinearVelocity( event.m_Data.GetObject1PreCollisionVelocity() );
-			JPH::Vec3 object2Vel = event.m_Data.GetPair().pObject2->FakeJoltLinearVelocity( event.m_Data.GetObject2PreCollisionVelocity() );
+			JPH::Vec3 object1Vel = pObj1->FakeJoltLinearVelocity( event.m_Data.GetObject1PreCollisionVelocity() );
+			JPH::Vec3 object2Vel = pObj2->FakeJoltLinearVelocity( event.m_Data.GetObject2PreCollisionVelocity() );
 			m_pGameListener->PreCollision( &event.m_Event );
-			event.m_Data.GetPair().pObject1->RestoreJoltLinearVelocity( object1Vel );
-			event.m_Data.GetPair().pObject2->RestoreJoltLinearVelocity( object2Vel );
+			pObj1->RestoreJoltLinearVelocity( object1Vel );
+			pObj2->RestoreJoltLinearVelocity( object2Vel );
 		});
 
 		// Send StartTouch events
@@ -491,7 +505,7 @@ private:
 			m_Event.isCollision			= IsCollision( pObject1, pObject2 );
 			m_Event.isShadowCollision	= IsShadowCollision( pObject1, pObject2 );
 			m_Event.deltaCollisionTime	= 100.0f;
-			m_Event.collisionSpeed		= GetCollisionSpeed( pObject1, pObject2, info.m_SurfaceNormal );
+			m_Event.collisionSpeed		= 0.0f;
 			m_Event.pInternalData		= &m_Data;
 		}
 
