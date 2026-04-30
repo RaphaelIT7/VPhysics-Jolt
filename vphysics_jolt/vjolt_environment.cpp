@@ -850,6 +850,9 @@ void JoltPhysicsEnvironment::Simulate( float deltaTime )
 	}
 	m_ContactListener.FlushCallbacks();
 
+	for ( size_t i = 0, n = m_pConstraints.size(); i < n; ++i )
+		m_pConstraints[i]->CheckBroken();
+
 	const JPH::BodyID *pActiveBodies = m_PhysicsSystem.GetActiveBodiesUnsafe( JPH::EBodyType::RigidBody );
 	uint32_t uActiveBodies = m_PhysicsSystem.GetNumActiveBodies( JPH::EBodyType::RigidBody );
 	for ( uint32_t i = 0; i < uActiveBodies; i++ )
@@ -1526,6 +1529,18 @@ void JoltPhysicsEnvironment::NotifyConstraintDisabled( JoltPhysicsConstraint* pC
 {
 	if ( m_pConstraintListener && m_EnableConstraintNotify )
 		m_pConstraintListener->ConstraintBroken( pConstraint );
+}
+
+//-------------------------------------------------------------------------------------------------
+
+void JoltPhysicsEnvironment::RegisterConstraint( JoltPhysicsConstraint *pConstraint )
+{
+	m_pConstraints.push_back( pConstraint );
+}
+
+void JoltPhysicsEnvironment::UnregisterConstraint( JoltPhysicsConstraint *pConstraint )
+{
+	Erase( m_pConstraints, pConstraint );
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -31,6 +31,11 @@ static ConVar vjolt_constraint_position_substeps( "vjolt_constraint_position_sub
 
 static ConVar vjolt_ragdoll_min_torque_friction( "vjolt_ragdoll_min_torque_friction", "0.05" );
 
+static constexpr float UNBREAKABLE_BREAK_LIMIT = 1e12f;
+
+static ConVar vjolt_constraint_break_debug( "vjolt_constraint_break_debug", "0", FCVAR_NONE,
+	"Log lambda + threshold values whenever a breakable constraint trips." );
+
 //-------------------------------------------------------------------------------------------------
 
 static JPH::Vec3 HingePerpendicularVector( JPH::Vec3Arg dir )
@@ -107,6 +112,7 @@ JoltPhysicsConstraint::JoltPhysicsConstraint( JoltPhysicsEnvironment *pPhysicsEn
 {
 	m_pObjReference->AddDestroyedListener( this );
 	m_pObjAttached->AddDestroyedListener( this );
+	m_pPhysicsEnvironment->RegisterConstraint( this );
 }
 
 JoltPhysicsConstraint::~JoltPhysicsConstraint()
@@ -116,6 +122,8 @@ JoltPhysicsConstraint::~JoltPhysicsConstraint()
 		m_pGroup->RemoveConstraint( this );
 		m_pGroup = nullptr;
 	}
+
+	m_pPhysicsEnvironment->UnregisterConstraint( this );
 
 	DestroyConstraint();
 }
@@ -247,10 +255,35 @@ bool JoltPhysicsConstraint::GetConstraintTransform( matrix3x4_t *pConstraintToRe
 	return true;
 }
 
-// Slart: Yet another debugging thing
 bool JoltPhysicsConstraint::GetConstraintParams( constraint_breakableparams_t *pParams ) const
 {
-	return false;
+	if ( !pParams )
+		return false;
+
+	pParams->forceLimit = m_SourceForceLimit;
+	pParams->torqueLimit = m_SourceTorqueLimit;
+	pParams->bodyMassScale[0] = m_BodyMassScale[0];
+	pParams->bodyMassScale[1] = m_BodyMassScale[1];
+	pParams->strength = m_BreakStrength;
+	pParams->isActive = m_pConstraint ? m_pConstraint->GetEnabled() : false;
+	return true;
+}
+
+//-------------------------------------------------------------------------------------------------
+
+void JoltPhysicsConstraint::SetBreakableParams( const constraint_breakableparams_t &params )
+{
+	m_SourceForceLimit = params.forceLimit;
+	m_SourceTorqueLimit = params.torqueLimit;
+	m_BreakStrength = params.strength;
+	m_BodyMassScale[0] = params.bodyMassScale[0];
+	m_BodyMassScale[1] = params.bodyMassScale[1];
+
+	const bool bBreakLinear = params.forceLimit > 0.0f && params.forceLimit < UNBREAKABLE_BREAK_LIMIT;
+	const bool bBreakAngular = params.torqueLimit > 0.0f && params.torqueLimit < UNBREAKABLE_BREAK_LIMIT;
+
+	m_LinearBreakImpulse = bBreakLinear ? SourceToJolt::Distance( params.forceLimit ) : 0.0f;
+	m_AngularBreakImpulse = bBreakAngular ? DEG2RAD( params.torqueLimit ) : 0.0f;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -336,6 +369,7 @@ void JoltPhysicsConstraint::InitialiseRagdoll( IPhysicsConstraintGroup *pGroup, 
 {
 	SetGroup( pGroup );
 	m_ConstraintType = CONSTRAINT_RAGDOLL;
+	SetBreakableParams( ragdoll.constraint );
 
 	JPH::Mat44 constraintToReference = SourceToJolt::Matrix( ragdoll.constraintToReference );
 	JPH::Mat44 constraintToAttached = SourceToJolt::Matrix( ragdoll.constraintToAttached );
@@ -426,6 +460,7 @@ void JoltPhysicsConstraint::InitialiseHinge( IPhysicsConstraintGroup *pGroup, co
 {
 	SetGroup( pGroup );
 	m_ConstraintType = CONSTRAINT_HINGE;
+	SetBreakableParams( hinge.constraint );
 
 	// Get our bodies
 	JPH::Body *refBody = m_pObjReference->GetBody();
@@ -464,6 +499,7 @@ void JoltPhysicsConstraint::InitialiseSliding( IPhysicsConstraintGroup *pGroup, 
 {
 	SetGroup( pGroup );
 	m_ConstraintType = CONSTRAINT_SLIDING;
+	SetBreakableParams( sliding.constraint );
 
 	// Get our bodies
 	JPH::Body *refBody = m_pObjReference->GetBody();
@@ -502,6 +538,7 @@ void JoltPhysicsConstraint::InitialiseBallsocket( IPhysicsConstraintGroup *pGrou
 {
 	SetGroup( pGroup );
 	m_ConstraintType = CONSTRAINT_BALLSOCKET;
+	SetBreakableParams( ballsocket.constraint );
 
 	// Get our bodies
 	JPH::Body *refBody = m_pObjReference->GetBody();
@@ -528,6 +565,7 @@ void JoltPhysicsConstraint::InitialiseFixed( IPhysicsConstraintGroup *pGroup, co
 {
 	SetGroup( pGroup );
 	m_ConstraintType = CONSTRAINT_FIXED;
+	SetBreakableParams( fixed.constraint );
 
 	// Get our bodies
 	JPH::Body *refBody = m_pObjReference->GetBody();
@@ -551,6 +589,7 @@ void JoltPhysicsConstraint::InitialiseLength( IPhysicsConstraintGroup *pGroup, c
 {
 	SetGroup( pGroup );
 	m_ConstraintType = CONSTRAINT_LENGTH;
+	SetBreakableParams( length.constraint );
 
 	// Get our bodies
 	JPH::Body *refBody = m_pObjReference->GetBody();
@@ -587,6 +626,7 @@ void JoltPhysicsConstraint::InitialisePulley( IPhysicsConstraintGroup *pGroup, c
 {
 	SetGroup( pGroup );
 	m_ConstraintType = CONSTRAINT_PULLEY;
+	SetBreakableParams( pulley.constraint );
 
 	// Get our bodies
 	JPH::Body* refBody = m_pObjReference->GetBody();
@@ -610,6 +650,129 @@ void JoltPhysicsConstraint::InitialisePulley( IPhysicsConstraintGroup *pGroup, c
 	m_pConstraint->SetEnabled( !pGroup && pulley.constraint.isActive );
 
 	m_pPhysicsSystem->AddConstraint( m_pConstraint );
+}
+
+//-------------------------------------------------------------------------------------------------
+
+static void GetConstraintImpulses( const JPH::Constraint *pConstraint, float &outLinear, float &outAngular )
+{
+	outLinear = 0.0f;
+	outAngular = 0.0f;
+
+	switch ( pConstraint->GetSubType() )
+	{
+		case JPH::EConstraintSubType::Fixed:
+		{
+			auto *p = static_cast< const JPH::FixedConstraint * >( pConstraint );
+			outLinear = p->GetTotalLambdaPosition().Length();
+			outAngular = p->GetTotalLambdaRotation().Length();
+			break;
+		}
+		case JPH::EConstraintSubType::Point:
+		{
+			auto *p = static_cast< const JPH::PointConstraint * >( pConstraint );
+			outLinear = p->GetTotalLambdaPosition().Length();
+			break;
+		}
+		case JPH::EConstraintSubType::Hinge:
+		{
+			auto *p = static_cast< const JPH::HingeConstraint * >( pConstraint );
+			outLinear = p->GetTotalLambdaPosition().Length();
+			outAngular = Max( p->GetTotalLambdaRotation().Length(), fabsf( p->GetTotalLambdaRotationLimits() ) );
+			break;
+		}
+		case JPH::EConstraintSubType::Slider:
+		{
+			auto *p = static_cast< const JPH::SliderConstraint * >( pConstraint );
+			outLinear = Max( p->GetTotalLambdaPosition().Length(), fabsf( p->GetTotalLambdaPositionLimits() ) );
+			outAngular = p->GetTotalLambdaRotation().Length();
+			break;
+		}
+		case JPH::EConstraintSubType::Distance:
+		{
+			auto *p = static_cast< const JPH::DistanceConstraint * >( pConstraint );
+			outLinear = fabsf( p->GetTotalLambdaPosition() );
+			break;
+		}
+		case JPH::EConstraintSubType::SwingTwist:
+		{
+			auto *p = static_cast< const JPH::SwingTwistConstraint * >( pConstraint );
+			outLinear = p->GetTotalLambdaPosition().Length();
+			const float flTwist  = p->GetTotalLambdaTwist();
+			const float flSwingY = p->GetTotalLambdaSwingY();
+			const float flSwingZ = p->GetTotalLambdaSwingZ();
+			outAngular = sqrtf( flTwist * flTwist + flSwingY * flSwingY + flSwingZ * flSwingZ );
+			break;
+		}
+		case JPH::EConstraintSubType::Pulley:
+		{
+			auto *p = static_cast< const JPH::PulleyConstraint * >( pConstraint );
+			outLinear = fabsf( p->GetTotalLambdaPosition() );
+			break;
+		}
+		default:
+			break;
+	}
+}
+
+static float MaxInverseMass( JoltPhysicsObject *pA, JoltPhysicsObject *pB )
+{
+	auto invMassOf = []( JoltPhysicsObject *pObj ) -> float
+	{
+		if ( !pObj )
+			return 0.0f;
+		JPH::Body *pBody = pObj->GetBody();
+		if ( !pBody || pBody->IsStatic() )
+			return 0.0f;
+		JPH::MotionProperties *pMP = pBody->GetMotionProperties();
+		return pMP ? pMP->GetInverseMass() : 0.0f;
+	};
+	return Max( invMassOf( pA ), invMassOf( pB ) );
+}
+
+bool JoltPhysicsConstraint::CheckBroken()
+{
+	if ( !m_pConstraint || !m_pConstraint->GetEnabled() )
+		return false;
+
+	if ( m_LinearBreakImpulse <= 0.0f && m_AngularBreakImpulse <= 0.0f )
+		return false;
+
+	float flLinear = 0.0f;
+	float flAngular = 0.0f;
+	GetConstraintImpulses( m_pConstraint.GetPtr(), flLinear, flAngular );
+
+	const int nIterations = Max( 1u, m_pPhysicsSystem->GetPhysicsSettings().mNumVelocitySteps );
+	const float flLinearLimit = m_LinearBreakImpulse * float( nIterations );
+	const float flAngularLimit = m_AngularBreakImpulse * float( nIterations );
+
+	bool bLinearBreak = false;
+	if ( m_LinearBreakImpulse > 0.0f && flLinear > 0.0f )
+	{
+		const float flInvMassMax = MaxInverseMass( m_pObjReference, m_pObjAttached );
+		bLinearBreak = flLinear * flLinear * flInvMassMax > flLinearLimit * flLinearLimit;
+	}
+
+	const bool bAngularBreak = m_AngularBreakImpulse > 0.0f && flAngular > flAngularLimit;
+
+	if ( !bLinearBreak && !bAngularBreak )
+		return false;
+
+	if ( vjolt_constraint_break_debug.GetBool() )
+	{
+		const float flInvMassMax = MaxInverseMass( m_pObjReference, m_pObjAttached );
+		Log_Msg( LOG_VJolt,
+			"Constraint break: type=%d sub=%d linear=%.3f (limit=%.3f, src=%.3f) angular=%.3f (limit=%.3f, src=%.3f) iters=%d invMassMax=%.5f reasons=%s%s\n",
+			int( m_ConstraintType ), int( m_pConstraint->GetSubType() ),
+			flLinear, flLinearLimit, m_SourceForceLimit,
+			flAngular, flAngularLimit, m_SourceTorqueLimit,
+			nIterations, flInvMassMax,
+			bLinearBreak ? "linear " : "", bAngularBreak ? "angular" : "" );
+	}
+
+	m_pConstraint->SetEnabled( false );
+	m_pPhysicsEnvironment->NotifyConstraintDisabled( this );
+	return true;
 }
 
 //-------------------------------------------------------------------------------------------------

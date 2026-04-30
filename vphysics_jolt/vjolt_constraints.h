@@ -83,11 +83,15 @@ public:
 
 	void SaveConstraintSettings( JPH::StateRecorder &recorder );
 
+	bool CheckBroken();
+
 private:
 
 	void SetGroup( IPhysicsConstraintGroup *pGroup );
 
 	void DestroyConstraint();
+
+	void SetBreakableParams( const constraint_breakableparams_t &params );
 
 	JoltPhysicsObject			*m_pObjReference = nullptr;
 	JoltPhysicsObject			*m_pObjAttached = nullptr;
@@ -99,4 +103,11 @@ private:
 	void						*m_pGameData = nullptr;
 	JoltPhysicsEnvironment		*m_pPhysicsEnvironment = nullptr;
 	JPH::PhysicsSystem			*m_pPhysicsSystem = nullptr;
+
+	float						m_LinearBreakImpulse = 0.0f;
+	float						m_AngularBreakImpulse = 0.0f;
+	float						m_SourceForceLimit = 0.0f;
+	float						m_SourceTorqueLimit = 0.0f;
+	float						m_BreakStrength = 1.0f;
+	float						m_BodyMassScale[2] = { 1.0f, 1.0f };
 };

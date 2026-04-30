@@ -193,6 +193,9 @@ public:
 
 	void NotifyConstraintDisabled( JoltPhysicsConstraint* pConstraint );
 
+	void RegisterConstraint( JoltPhysicsConstraint *pConstraint );
+	void UnregisterConstraint( JoltPhysicsConstraint *pConstraint );
+
 	void AddDirtyStaticBody( const JPH::BodyID &id );
 	void RemoveDirtyStaticBody( const JPH::BodyID &id );
 
@@ -242,6 +245,9 @@ private:
 	std::vector< JoltPhysicsObject * > m_pDeadObjects;
 	std::vector< JoltPhysicsConstraint * > m_pDeadConstraints;
 	std::vector< CPhysCollide * > m_pDeadObjectCollides;
+
+	// All live (non-deleted) constraints, used by the breakable constraint check.
+	std::vector< JoltPhysicsConstraint * > m_pConstraints;
 
 	std::vector< IJoltPhysicsController * > m_pPhysicsControllers;
 
