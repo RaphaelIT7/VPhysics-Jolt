@@ -1175,7 +1175,7 @@ void JoltPhysicsObject::RemoveHinged()
 
 IPhysicsFrictionSnapshot *JoltPhysicsObject::CreateFrictionSnapshot()
 {
-	return new JoltPhysicsFrictionSnapshot;
+	return new JoltPhysicsFrictionSnapshot( this );
 }
 
 void JoltPhysicsObject::DestroyFrictionSnapshot( IPhysicsFrictionSnapshot *pSnapshot )
