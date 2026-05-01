@@ -398,9 +398,7 @@ Vector JoltPhysicsObject::GetInertia() const
 		return Vector( 1.0f, 1.0f, 1.0f );
 
 	JPH::Vec3 joltInertiaTensor = m_pBody->GetMotionProperties()->GetInverseInertiaDiagonal().Reciprocal();
-	Vector vInertiaTensor = JoltToSource::Distance( joltInertiaTensor );
-	// For some reason, Source abs's in GetInertia/GetInvInertia. Don't ask me why.
-	return Abs( vInertiaTensor );
+	return Abs( Vector( joltInertiaTensor.GetX(), joltInertiaTensor.GetY(), joltInertiaTensor.GetZ() ) );
 }
 
 Vector JoltPhysicsObject::GetInvInertia() const
@@ -409,15 +407,22 @@ Vector JoltPhysicsObject::GetInvInertia() const
 		return Vector( 1.0f, 1.0f, 1.0f );
 
 	JPH::Vec3 joltInertiaTensor = m_pBody->GetMotionProperties()->GetInverseInertiaDiagonal();
-	Vector vInertiaTensor = JoltToSource::Distance( joltInertiaTensor );
-	return Abs( vInertiaTensor );
+	return Abs( Vector( joltInertiaTensor.GetX(), joltInertiaTensor.GetY(), joltInertiaTensor.GetZ() ) );
 }
 
 void JoltPhysicsObject::SetInertia( const Vector &inertia )
 {
-	// TODO(Josh): Does anything use this?
-	// and if so, does this specify the local diagonal or rotated diagonal?
-	Log_Stub( LOG_VJolt );
+	if ( IsStatic() )
+		return;
+
+	Vector ri = Abs( inertia );
+
+	JPH::Vec3 joltInvInertia(
+		ri.x > 1e-9f ? 1.0f / ri.x : 0.0f,
+		ri.y > 1e-9f ? 1.0f / ri.y : 0.0f,
+		ri.z > 1e-9f ? 1.0f / ri.z : 0.0f );
+
+	m_pBody->GetMotionProperties()->SetInverseInertia( joltInvInertia, JPH::Quat::sIdentity() );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -604,7 +609,13 @@ void JoltPhysicsObject::SetVelocity( const Vector *velocity, const AngularImpuls
 	}
 
 	JPH::Vec3 joltLinearVelocity = velocity ? SourceToJolt::Distance( *velocity ) : JPH::Vec3{};
-	JPH::Vec3 joltAngularVelocity = angularVelocity ? SourceToJolt::AngularImpulse( *angularVelocity ) : JPH::Vec3{};
+	JPH::Vec3 joltAngularVelocity = JPH::Vec3{};
+	if ( angularVelocity )
+	{
+		Vector worldAng;
+		LocalToWorldVector( &worldAng, *angularVelocity );
+		joltAngularVelocity = SourceToJolt::AngularImpulse( worldAng );
+	}
 
 	JPH::BodyInterface &bodyInterface = m_pPhysicsSystem->GetBodyInterfaceNoLock();
 
@@ -637,7 +648,10 @@ void JoltPhysicsObject::GetVelocity( Vector *velocity, AngularImpulse *angularVe
 		*velocity = JoltToSource::Distance( joltLinearVelocity );
 
 	if ( angularVelocity )
-		*angularVelocity = JoltToSource::AngularImpulse( joltAngularVelocity );
+	{
+		Vector worldAng = JoltToSource::AngularImpulse( joltAngularVelocity );
+		WorldToLocalVector( angularVelocity, worldAng );
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -665,7 +679,11 @@ void JoltPhysicsObject::AddVelocity( const Vector *velocity, const AngularImpuls
 			body.SetLinearVelocityClamped( body.GetLinearVelocity() + SourceToJolt::Distance( *velocity ) );
 
 		if ( angularVelocity )
-			body.SetAngularVelocityClamped( body.GetAngularVelocity() + SourceToJolt::AngularImpulse( *angularVelocity ) );
+		{
+			Vector worldAng;
+			LocalToWorldVector( &worldAng, *angularVelocity );
+			body.SetAngularVelocityClamped( body.GetAngularVelocity() + SourceToJolt::AngularImpulse( worldAng ) );
+		}
 
 		if ( !body.IsActive() && ( !body.GetLinearVelocity().IsNearZero() || !body.GetAngularVelocity().IsNearZero() ) )
 			m_pPhysicsSystem->GetBodyInterfaceNoLock().ActivateBodies( &m_pBody->GetID(), 1 );
