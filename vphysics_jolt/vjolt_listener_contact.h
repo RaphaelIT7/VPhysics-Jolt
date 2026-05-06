@@ -104,8 +104,19 @@ public:
 			const Vector vecCollideNormal = Vector( inManifold.mWorldSpaceNormal.GetX(), inManifold.mWorldSpaceNormal.GetY(), inManifold.mWorldSpaceNormal.GetZ() );
 			const float flCollisionSpeed = JoltPhysicsCollisionEvent::GetCollisionSpeed( pObject1, pObject2, vecCollideNormal );
 
+			// Skip impact reporting when either body is currently held by the player.
+			// The physgun's shadow controller drives the held body into the contact
+			// every tick; under IVP this would resolve to zero relative velocity at
+			// the contact (run-to-convergence), but Jolt's fixed-iteration solver
+			// leaves residual velocity that the engine reads as a "real" impact and
+			// triggers camera shake / impact sounds for what is really player input.
+			const bool bHeldByPlayer =
+				( pObject1->GetGameFlags() & FVPHYSICS_PLAYER_HELD ) ||
+				( pObject2->GetGameFlags() & FVPHYSICS_PLAYER_HELD );
+
 			const bool bHasSound =
 				flCollisionSpeed >= 70.0f &&
+				!bHeldByPlayer &&
 				pObject1->GetGameMaterialAllowsSounds() &&
 				pObject2->GetGameMaterialAllowsSounds();
 
