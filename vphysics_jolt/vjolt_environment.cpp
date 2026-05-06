@@ -800,7 +800,7 @@ void JoltPhysicsEnvironment::Simulate( float deltaTime )
 		settings.mNumPositionSteps = vjolt_position_steps.GetInt();
 		settings.mDeterministicSimulation = vjolt_deterministic.GetBool();
 		settings.mLinearCastThreshold = 0.0f;
-		settings.mLinearCastMaxPenetration = 0.03f;
+		settings.mLinearCastMaxPenetration = 0.25f;
 		m_PhysicsSystem.SetPhysicsSettings( settings );
 	}
 
