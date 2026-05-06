@@ -227,10 +227,12 @@ JoltPhysicsEnvironment::JoltPhysicsEnvironment()
 		return sqrt( inBody1.GetFriction() * inBody2.GetFriction() );
 	} );
 
-	// Source's values expect them to be multiplied.
+	// Source's values expect them to be multiplied. Clamp the combined result to
+	// [0, 1] to match IVP's CIVPMaterialManager::get_elasticity, since raw
+	// surfaceprop elasticity values can be far above 1 (e.g. Metal_bouncy = 1000).
 	m_PhysicsSystem.SetCombineRestitution( []( const JPH::Body &inBody1, const JPH::SubShapeID& inSubShapeID1, const JPH::Body &inBody2, const JPH::SubShapeID& inSubShapeID2 ) -> float
 	{
-		return inBody1.GetRestitution() * inBody2.GetRestitution();
+		return Clamp<float>( inBody1.GetRestitution() * inBody2.GetRestitution(), 0.0f, 1.0f );
 	} );
 
 	// Set our linear cast member
