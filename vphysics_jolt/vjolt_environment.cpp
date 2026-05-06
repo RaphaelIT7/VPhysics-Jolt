@@ -795,9 +795,8 @@ void JoltPhysicsEnvironment::Simulate( float deltaTime )
 		settings.mNumVelocitySteps = vjolt_velocity_steps.GetInt();
 		settings.mNumPositionSteps = vjolt_position_steps.GetInt();
 		settings.mDeterministicSimulation = vjolt_deterministic.GetBool();
-		// Raphael: These seem to help against objects clipping through others? Idk, should test them more and read the docs.
-		settings.mLinearCastThreshold = 0;
-		settings.mLinearCastMaxPenetration = 0;
+		settings.mLinearCastThreshold = 0.0f;
+		settings.mLinearCastMaxPenetration = 0.03f;
 		m_PhysicsSystem.SetPhysicsSettings( settings );
 	}
 
