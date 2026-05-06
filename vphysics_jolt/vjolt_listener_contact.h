@@ -2,6 +2,9 @@
 #pragma once
 
 #include "vjolt_controller_fluid.h"
+#include "vjolt_surfaceprops.h"
+
+#include <Jolt/Physics/Collision/EstimateCollisionResponse.h>
 
 struct JoltPhysicsContactPair
 {
@@ -134,20 +137,59 @@ public:
 		if ( !m_pGameListener )
 			return;
 
-		// TODO(Josh): Need a way to calculate the energy to send friction callbacks.
-		// 
-		//JoltPhysicsObject *pObject1 = reinterpret_cast< JoltPhysicsObject * >( inBody1.GetUserData() );
-		//JoltPhysicsObject *pObject2 = reinterpret_cast< JoltPhysicsObject * >( inBody2.GetUserData() );
-		//
-		//if ( !ShouldFrictionCallback( pObject1, pObject2 ) )
-		//	return;
-		//
-		//JoltPhysicsCollisionData data( inManifold );
-		//std::unique_lock lock( m_CallbackMutex );
+		if ( !ShouldFrictionCallback( pObject1, pObject2 ) )
+			return;
 
-		// RaphaelIT7: It should be noted that to fill the **second** hitSurface / materialIndex argument we should use RemapIVPMaterialIndex to keep IVP behavior!
-		//m_pGameListener->Friction( pObject1, 15500.0f, pObject1->GetMaterialIndex(), JoltPhysicsSurfaceProps::GetInstance().RemapIVPMaterialIndex( pObject2->GetMaterialIndex() ), &data );
-		//m_pGameListener->Friction( pObject2, 15500.0f, pObject2->GetMaterialIndex(), JoltPhysicsSurfaceProps::GetInstance().RemapIVPMaterialIndex( pObject1->GetMaterialIndex() ), &data );
+		// Jolt's contact constraint hasn't been solved at this callback (so the actual
+		// friction impulse is unknown). EstimateCollisionResponse runs a few iterations
+		// of the same impulse solver internally to produce an accurate estimate for
+		// two-body contacts - Jolt's docs explicitly recommend it for sound/particle
+		// triggering from contact callbacks.
+		JPH::CollisionEstimationResult result;
+		JPH::EstimateCollisionResponse( inBody1, inBody2, inManifold, result,
+			ioSettings.mCombinedFriction, ioSettings.mCombinedRestitution,
+			/*minVelocityForRestitution*/ 1.0f, /*numIterations*/ 4 );
+
+		// Sum friction impulse vectors across the manifold's contact points.
+		JPH::Vec3 vFrictionImpulse = JPH::Vec3::sZero();
+		for ( const JPH::CollisionEstimationResult::Impulse &imp : result.mImpulses )
+			vFrictionImpulse += imp.mFrictionImpulse1 * result.mTangent1
+			                  + imp.mFrictionImpulse2 * result.mTangent2;
+
+		const float flFrictionImpulseMag = vFrictionImpulse.Length();
+		if ( flFrictionImpulseMag < 1e-4f )
+			return;
+
+		// Relative tangent velocity at the contact (first point — sliding contacts
+		// typically have one dominant manifold point).
+		const JPH::Vec3 vWorldContact = inManifold.GetWorldSpaceContactPointOn1( 0 );
+		const JPH::Vec3 vRel = inBody1.GetPointVelocity( vWorldContact ) - inBody2.GetPointVelocity( vWorldContact );
+		const JPH::Vec3 vTangent = vRel - vRel.Dot( inManifold.mWorldSpaceNormal ) * inManifold.mWorldSpaceNormal;
+		const float flTangentSpeed = vTangent.Length();
+
+		// Skip near-stationary contacts to avoid event spam every tick.
+		constexpr float kMinTangentSpeed = 0.5f; // ~50 cm/s
+		if ( flTangentSpeed < kMinTangentSpeed )
+			return;
+
+		// IVP's friction event reports `eliminated_energy / dt / mass` (specific power, W/kg)
+		// then converts to HL units with the same in²/m² factor we use here. We match that
+		// so the engine's energy thresholds behave as they did under IVP. The friction
+		// impulse from EstimateCollisionResponse is per-step; assume Source's typical
+		// 60Hz physics step for the dt scaling.
+		const float flMass1 = pObject1->IsStatic() ? 0.0f : pObject1->GetMass();
+		const float flMass2 = pObject2->IsStatic() ? 0.0f : pObject2->GetMass();
+		const float flMass = flMass1 > 0.0f ? flMass1 : flMass2;
+		if ( flMass <= 0.0f )
+			return;
+
+		constexpr float kAssumedStepDt = 1.0f / 60.0f;
+		const float flPowerPerMass = ( flFrictionImpulseMag * flTangentSpeed ) / kAssumedStepDt / flMass;
+		const float flEnergy = JoltToSource::Energy( flPowerPerMass );
+
+		m_FrictionEvents.EmplaceBack( GetThreadId(),
+			JoltPhysicsCollisionInfo( pObject1, pObject2, inManifold ),
+			flEnergy );
 	}
 
 	void OnContactRemoved( const JPH::SubShapeIDPair &inSubShapePair )
@@ -372,6 +414,26 @@ public:
 			m_pGameListener->PostCollision( &event.m_Event );
 		});
 
+		// Send Friction events. The game uses these to drive scrape sounds and
+		// particle effects on sustained sliding contacts.
+		m_FrictionEvents.ForEach< true >( [ this ]( JoltPhysicsFrictionEvent& event )
+		{
+			JoltPhysicsObject *pObj1 = event.m_Data.GetPair().pObject1;
+			JoltPhysicsObject *pObj2 = event.m_Data.GetPair().pObject2;
+			const int nMtl1 = pObj1->GetMaterialIndex();
+			const int nMtl2 = pObj2->GetMaterialIndex();
+		#if !defined( GAME_GMOD_64X )
+			JoltPhysicsSurfaceProps &props = JoltPhysicsSurfaceProps::GetInstance();
+			const int nMtl1Hit = props.RemapIVPMaterialIndex( nMtl2 );
+			const int nMtl2Hit = props.RemapIVPMaterialIndex( nMtl1 );
+		#else
+			const int nMtl1Hit = nMtl2;
+			const int nMtl2Hit = nMtl1;
+		#endif
+			m_pGameListener->Friction( pObj1, event.m_flEnergy, nMtl1, nMtl1Hit, &event.m_Data );
+			m_pGameListener->Friction( pObj2, event.m_flEnergy, nMtl2, nMtl2Hit, &event.m_Data );
+		});
+
 		// Send EndTouch events
 		m_EndTouchEvents.ForEach< true >( [ this ]( JoltPhysicsCollisionData& event )
 		{
@@ -552,6 +614,19 @@ private:
 		JoltPhysicsCollisionData	m_Data;
 	};
 
+	class JoltPhysicsFrictionEvent
+	{
+	public:
+		JoltPhysicsFrictionEvent( const JoltPhysicsCollisionInfo &info, float flEnergy )
+			: m_Data( info )
+			, m_flEnergy( flEnergy )
+		{
+		}
+
+		JoltPhysicsCollisionData	m_Data;
+		float						m_flEnergy = 0.0f;
+	};
+
 	template < typename Data >
 	struct JoltPhysicsEventTracker
 	{
@@ -593,6 +668,7 @@ private:
 	std::atomic< uint32 > m_GlobalCollisionEventCount = { 0u };
 
 	JoltPhysicsEventTracker< JoltPhysicsCollisionEvent >	m_CollisionEvents;
+	JoltPhysicsEventTracker< JoltPhysicsFrictionEvent >		m_FrictionEvents;
 
 	JoltPhysicsEventTracker< JoltPhysicsCollisionData >		m_StartTouchEvents;
 	JoltPhysicsEventTracker< JoltPhysicsCollisionData >		m_EndTouchEvents;
