@@ -608,7 +608,9 @@ JPH::WheeledVehicleControllerSettings *JoltPhysicsVehicleController::CreateVehic
 	pController->mEngine.mMaxRPM = m_VehicleParams.engine.maxRPM;
 	pController->mEngine.mAngularDamping = 0.0f;
 
-	pController->mTransmission.mMode = m_VehicleParams.engine.isAutoTransmission ? JPH::ETransmissionMode::Auto : JPH::ETransmissionMode::Manual;
+	// Some vehicle scripts define just a single gear and have Autotransmission set to 0, in jolt the gear 0 is
+	// neutral so it never moves, also some data like MaxSpeed doesn't really align, this has to do.
+	pController->mTransmission.mMode = JPH::ETransmissionMode::Auto;
 	pController->mTransmission.mGearRatios.clear();
 	for ( int i = 0; i < m_VehicleParams.engine.gearCount; i++ )
 		pController->mTransmission.mGearRatios.push_back( m_VehicleParams.engine.gearRatio[ i ] );
