@@ -1037,6 +1037,66 @@ static float ComputeShadowController( JoltShadowControlParams &params, JPH::Vec3
 }
 
 
+void JoltPhysicsObject::ClampShadowVelocityAgainstContacts( JPH::Vec3 &ioVelocity, const JPH::Vec3 &vBodyPos, const JPH::Quat &qBodyRot )
+{
+	class ClampCollector final : public JPH::CollideShapeCollector
+	{
+	public:
+		ClampCollector( JPH::Vec3 *pVel ) : m_pVel( pVel ) {}
+		void AddHit( const JPH::CollideShapeResult &inResult ) override
+		{
+			const JPH::Vec3 vNormal = inResult.mPenetrationAxis.NormalizedOr( JPH::Vec3::sAxisZ() );
+			const float flInto = m_pVel->Dot( vNormal );
+			if ( flInto > 0.0f )
+				*m_pVel = *m_pVel - vNormal * flInto;
+		}
+	private:
+		JPH::Vec3 *m_pVel;
+	};
+
+	class StaticOnlyFilter final : public JPH::BodyFilter
+	{
+	public:
+		explicit StaticOnlyFilter( const JoltPhysicsObject *pSelf ) : m_pSelf( pSelf ) {}
+		bool ShouldCollideLocked( const JPH::Body &inBody ) const override
+		{
+			if ( reinterpret_cast< const JoltPhysicsObject * >( inBody.GetUserData() ) == m_pSelf )
+				return false;
+			// Only clamp against static world geometry. Clamping against dynamic
+			// bodies would block lifting an object that has stuff on top of it.
+			return inBody.IsStatic();
+		}
+	private:
+		const JoltPhysicsObject *m_pSelf;
+	};
+
+	JPH::Mat44 query_transform = JPH::Mat44::sRotationTranslation(
+		qBodyRot, vBodyPos + qBodyRot * m_pBody->GetShape()->GetCenterOfMass() );
+
+	JPH::CollideShapeSettings settings;
+	settings.mActiveEdgeMode = JPH::EActiveEdgeMode::CollideOnlyWithActive;
+	settings.mActiveEdgeMovementDirection = ioVelocity;
+	settings.mBackFaceMode = JPH::EBackFaceMode::IgnoreBackFaces;
+	settings.mMaxSeparationDistance = 0.025f;
+
+	ClampCollector collector( &ioVelocity );
+	StaticOnlyFilter filter( this );
+
+	JPH::DefaultBroadPhaseLayerFilter bpFilter = m_pPhysicsSystem->GetDefaultBroadPhaseLayerFilter( Layers::MOVING );
+	JPH::DefaultObjectLayerFilter olFilter = m_pPhysicsSystem->GetDefaultLayerFilter( Layers::MOVING );
+
+	m_pPhysicsSystem->GetNarrowPhaseQueryNoLock().CollideShape(
+		m_pBody->GetShape(),
+		JPH::Vec3::sReplicate( 1.0f ),
+		query_transform,
+		settings,
+		JPH::Vec3::sZero(),
+		collector,
+		bpFilter,
+		olFilter,
+		filter );
+}
+
 float JoltPhysicsObject::ComputeShadowControl( const hlshadowcontrol_params_t &params, float flSecondsToArrival, float flDeltaTime )
 {
 	JoltShadowControlParams joltParams =
@@ -1066,7 +1126,23 @@ float JoltPhysicsObject::ComputeShadowControl( const hlshadowcontrol_params_t &p
 	JPH::Vec3 scratchAngularVelocity = angularVelocity;
 	float flNewSecondsToArrival =
 		ComputeShadowController( joltParams, scratchPosition, scratchRotation, scratchLinearVelocity, scratchAngularVelocity, flSecondsToArrival, flDeltaTime );
-	
+
+	// IVP's shadow controller writes into pCore->speed which then participates in
+	// IVP's run-to-convergence contact resolution, implicitly clamping the velocity
+	// at any contact. Jolt's fixed-iteration solver can't fully clamp a hard-set
+	// velocity vector that points into a wall under sustained drive, which lets the
+	// physgun-held object (and anything it pushes) pass through walls. Pre-clamp the
+	// target velocity along blocked-direction contact normals before SetLinearAndAngularVelocity
+	// so the body isn't asked to move into a constrained direction in the first place.
+	//
+	// Static contacts always block. Dynamic contacts only block if THAT body is itself
+	// blocked along the same direction by a static contact (one level of IVP-style
+	// constraint propagation - handles "push A down onto B sitting on the ground").
+	if ( !scratchLinearVelocity.IsNearZero() )
+	{
+		ClampShadowVelocityAgainstContacts( scratchLinearVelocity, scratchPosition, scratchRotation );
+	}
+
 	if ( scratchPosition != position || scratchRotation != rotation )
 		bodyInterface.SetPositionAndRotation( m_pBody->GetID(), scratchPosition, scratchRotation, JPH::EActivation::Activate );
 

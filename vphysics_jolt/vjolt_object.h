@@ -127,6 +127,14 @@ public:
 	void						RemoveShadowController() override;
 	float						ComputeShadowControl( const hlshadowcontrol_params_t &params, float secondsToArrival, float dt ) override;
 
+private:
+	// Pre-clamp the shadow target velocity along contact normals where the body cannot
+	// move (static contacts, or dynamic contacts whose other body is itself blocked
+	// statically in that direction). Mirrors IVP's velocity clamping during contact
+	// resolution. Modifies ioVelocity in place.
+	void ClampShadowVelocityAgainstContacts( JPH::Vec3 &ioVelocity, const JPH::Vec3 &vBodyPos, const JPH::Quat &qBodyRot );
+public:
+
 
 	const CPhysCollide *	GetCollide() const override;
 	const char *			GetName() const override;
