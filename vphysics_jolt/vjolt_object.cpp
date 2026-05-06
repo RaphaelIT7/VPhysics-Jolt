@@ -12,6 +12,7 @@
 #include "vjolt_friction.h"
 #include "vjolt_environment.h"
 #include "vjolt_layers.h"
+#include "vjolt_listener_contact.h"
 #include "vjolt_controller_shadow.h"
 
 #include "vjolt_object.h"
@@ -1042,9 +1043,24 @@ void JoltPhysicsObject::ClampShadowVelocityAgainstContacts( JPH::Vec3 &ioVelocit
 	class ClampCollector final : public JPH::CollideShapeCollector
 	{
 	public:
-		ClampCollector( JPH::Vec3 *pVel ) : m_pVel( pVel ) {}
+		ClampCollector( JPH::Vec3 *pVel, JoltPhysicsObject *pSelf, JPH::PhysicsSystem *pSystem )
+			: m_pVel( pVel ), m_pSelf( pSelf ), m_pSystem( pSystem ) {}
+
 		void AddHit( const JPH::CollideShapeResult &inResult ) override
 		{
+			// Honor the game-side collision filter so we don't clamp against bodies
+			// that the game wouldn't actually collide with (e.g. NPC-clip brushes,
+			// which are static but pass through physics props).
+			JPH::BodyLockRead lock( m_pSystem->GetBodyLockInterfaceNoLock(), inResult.mBodyID2 );
+			if ( !lock.Succeeded() )
+				return;
+			JoltPhysicsObject *pOther = reinterpret_cast< JoltPhysicsObject * >( lock.GetBody().GetUserData() );
+			if ( !pOther || pOther == m_pSelf )
+				return;
+			JoltPhysicsContactListener *pListener = m_pSelf->GetJoltEnvironment()->GetContactListener();
+			if ( pListener && !pListener->ShouldCollide( m_pSelf, pOther ) )
+				return;
+
 			const JPH::Vec3 vNormal = inResult.mPenetrationAxis.NormalizedOr( JPH::Vec3::sAxisZ() );
 			const float flInto = m_pVel->Dot( vNormal );
 			if ( flInto > 0.0f )
@@ -1052,6 +1068,8 @@ void JoltPhysicsObject::ClampShadowVelocityAgainstContacts( JPH::Vec3 &ioVelocit
 		}
 	private:
 		JPH::Vec3 *m_pVel;
+		JoltPhysicsObject *m_pSelf;
+		JPH::PhysicsSystem *m_pSystem;
 	};
 
 	class StaticOnlyFilter final : public JPH::BodyFilter
@@ -1079,7 +1097,7 @@ void JoltPhysicsObject::ClampShadowVelocityAgainstContacts( JPH::Vec3 &ioVelocit
 	settings.mBackFaceMode = JPH::EBackFaceMode::IgnoreBackFaces;
 	settings.mMaxSeparationDistance = 0.025f;
 
-	ClampCollector collector( &ioVelocity );
+	ClampCollector collector( &ioVelocity, this, m_pPhysicsSystem );
 	StaticOnlyFilter filter( this );
 
 	JPH::DefaultBroadPhaseLayerFilter bpFilter = m_pPhysicsSystem->GetDefaultBroadPhaseLayerFilter( Layers::MOVING );
