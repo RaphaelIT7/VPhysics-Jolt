@@ -134,21 +134,34 @@ public:
 		// to satisfy the StartTouch/EndTouch events.
 		ioSettings.mIsSensor = !bShouldCollide || ioSettings.mIsSensor;
 
+		// Sensors don't generate impulses or friction events.
+		if ( ioSettings.mIsSensor )
+			return;
+
+		// Estimate the resolved contact and friction impulses for this manifold.
+		// Jolt doesn't expose post-solve constraint impulses cheaply, so we run a few
+		// iterations of the same impulse solver via EstimateCollisionResponse to get
+		// per-tick estimates - used both for friction sound events and for
+		// IPhysicsFrictionSnapshot::GetNormalForce / GetEnergyAbsorbed feedback.
+		JPH::CollisionEstimationResult result;
+		JPH::EstimateCollisionResponse( inBody1, inBody2, inManifold, result,
+			ioSettings.mCombinedFriction, ioSettings.mCombinedRestitution,
+			/*minVelocityForRestitution*/ 1.0f, /*numIterations*/ 4 );
+
+		// Sum normal impulse across contact points and stash on each body for the
+		// friction snapshot to read. IVP exposes get_vert_force per contact; this is
+		// the closest equivalent we can produce in Jolt.
+		float flNormalImpulseSum = 0.0f;
+		for ( const JPH::CollisionEstimationResult::Impulse &imp : result.mImpulses )
+			flNormalImpulseSum += imp.mContactImpulse;
+		pObject1->AccumulateContactNormalImpulse( pObject2, flNormalImpulseSum );
+		pObject2->AccumulateContactNormalImpulse( pObject1, flNormalImpulseSum );
+
 		if ( !m_pGameListener )
 			return;
 
 		if ( !ShouldFrictionCallback( pObject1, pObject2 ) )
 			return;
-
-		// Jolt's contact constraint hasn't been solved at this callback (so the actual
-		// friction impulse is unknown). EstimateCollisionResponse runs a few iterations
-		// of the same impulse solver internally to produce an accurate estimate for
-		// two-body contacts - Jolt's docs explicitly recommend it for sound/particle
-		// triggering from contact callbacks.
-		JPH::CollisionEstimationResult result;
-		JPH::EstimateCollisionResponse( inBody1, inBody2, inManifold, result,
-			ioSettings.mCombinedFriction, ioSettings.mCombinedRestitution,
-			/*minVelocityForRestitution*/ 1.0f, /*numIterations*/ 4 );
 
 		// Sum friction impulse vectors across the manifold's contact points.
 		JPH::Vec3 vFrictionImpulse = JPH::Vec3::sZero();
@@ -186,6 +199,10 @@ public:
 		constexpr float kAssumedStepDt = 1.0f / 60.0f;
 		const float flPowerPerMass = ( flFrictionImpulseMag * flTangentSpeed ) / kAssumedStepDt / flMass;
 		const float flEnergy = JoltToSource::Energy( flPowerPerMass );
+
+		// Snapshot also queries energy absorbed; track on both bodies.
+		pObject1->AccumulateContactFrictionEnergy( pObject2, flEnergy );
+		pObject2->AccumulateContactFrictionEnergy( pObject1, flEnergy );
 
 		m_FrictionEvents.EmplaceBack( GetThreadId(),
 			JoltPhysicsCollisionInfo( pObject1, pObject2, inManifold ),

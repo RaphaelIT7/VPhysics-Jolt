@@ -789,6 +789,10 @@ void JoltPhysicsEnvironment::Simulate( float deltaTime )
 	if ( deltaTime == 0.0f )
 		return;
 
+	// Advance the per-body contact-impulse tick so the contact listener clears
+	// stale impulses on first Accumulate call this tick.
+	JoltPhysicsObject::AdvanceContactImpulseTick();
+
 	{
 		JPH::PhysicsSettings settings = m_PhysicsSystem.GetPhysicsSettings();
 		settings.mBaumgarte = vjolt_baumgarte_factor.GetFloat(); // 0.2 def

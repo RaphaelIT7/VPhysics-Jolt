@@ -1189,6 +1189,66 @@ void JoltPhysicsObject::DestroyFrictionSnapshot( IPhysicsFrictionSnapshot *pSnap
 
 //-------------------------------------------------------------------------------------------------
 
+namespace
+{
+	std::atomic< uint32 > g_nContactImpulseTick{ 0 };
+}
+
+void JoltPhysicsObject::AdvanceContactImpulseTick()
+{
+	g_nContactImpulseTick.fetch_add( 1, std::memory_order_relaxed );
+}
+
+// Caller MUST hold m_LastContactImpulsesLock.
+static inline void TickStampedClear( uint32 &nLastTick, std::unordered_map< JoltPhysicsObject *, JoltPhysicsObject::ContactImpulse > &map )
+{
+	const uint32 nNow = g_nContactImpulseTick.load( std::memory_order_relaxed );
+	if ( nLastTick != nNow )
+	{
+		map.clear();
+		nLastTick = nNow;
+	}
+}
+
+void JoltPhysicsObject::AccumulateContactNormalImpulse( JoltPhysicsObject *pOther, float flImpulse )
+{
+	std::lock_guard< std::mutex > lock( m_LastContactImpulsesLock );
+	TickStampedClear( m_nLastImpulseTick, m_LastContactImpulses );
+	m_LastContactImpulses[ pOther ].flNormalImpulse += flImpulse;
+}
+
+void JoltPhysicsObject::AccumulateContactFrictionEnergy( JoltPhysicsObject *pOther, float flEnergy )
+{
+	std::lock_guard< std::mutex > lock( m_LastContactImpulsesLock );
+	TickStampedClear( m_nLastImpulseTick, m_LastContactImpulses );
+	m_LastContactImpulses[ pOther ].flFrictionEnergy += flEnergy;
+}
+
+float JoltPhysicsObject::GetLastContactNormalImpulse( JoltPhysicsObject *pOther ) const
+{
+	std::lock_guard< std::mutex > lock( m_LastContactImpulsesLock );
+	// Stale-tick entries don't get cleared on read (to avoid race with concurrent
+	// accumulators), but they're also never queried for currently-in-contact bodies
+	// (those are refreshed each tick). For non-current bodies the value is irrelevant.
+	auto it = m_LastContactImpulses.find( pOther );
+	return it != m_LastContactImpulses.end() ? it->second.flNormalImpulse : 0.0f;
+}
+
+float JoltPhysicsObject::GetLastContactFrictionEnergy( JoltPhysicsObject *pOther ) const
+{
+	std::lock_guard< std::mutex > lock( m_LastContactImpulsesLock );
+	auto it = m_LastContactImpulses.find( pOther );
+	return it != m_LastContactImpulses.end() ? it->second.flFrictionEnergy : 0.0f;
+}
+
+void JoltPhysicsObject::ClearContactImpulsesFor( JoltPhysicsObject *pOther )
+{
+	std::lock_guard< std::mutex > lock( m_LastContactImpulsesLock );
+	m_LastContactImpulses.erase( pOther );
+}
+
+//-------------------------------------------------------------------------------------------------
+
 void JoltPhysicsObject::OutputDebugInfo() const
 {
 	Log_Stub( LOG_VJolt );

@@ -6,6 +6,9 @@
 
 #pragma once
 
+#include <mutex>
+#include <unordered_map>
+
 class IPredictedPhysicsObject;
 
 class IJoltObjectDestroyedListener;
@@ -297,6 +300,30 @@ private:
 	QAngle m_qLastOrientation = vec3_angle;
 
 	CUtlVector< IJoltObjectDestroyedListener * > m_destroyedListeners;
+
+public:
+	// Per-other-body, last tick's accumulated contact impulses. Updated from the
+	// contact listener (multi-threaded) and read by JoltPhysicsFrictionSnapshot.
+	// Cleared lazily each Simulate before contact callbacks run.
+	struct ContactImpulse
+	{
+		float flNormalImpulse = 0.0f;   // kg*m/s, sum across this pair's contact points
+		float flFrictionEnergy = 0.0f;  // J, from friction event tracking
+	};
+
+	// Bumped once per Simulate so the next Accumulate call on each body knows to
+	// drop the previous tick's impulse map before adding new entries.
+	static void AdvanceContactImpulseTick();
+
+	void AccumulateContactNormalImpulse( JoltPhysicsObject *pOther, float flImpulse );
+	void AccumulateContactFrictionEnergy( JoltPhysicsObject *pOther, float flEnergy );
+	float GetLastContactNormalImpulse( JoltPhysicsObject *pOther ) const;
+	float GetLastContactFrictionEnergy( JoltPhysicsObject *pOther ) const;
+	void ClearContactImpulsesFor( JoltPhysicsObject *pOther );
+private:
+	std::unordered_map< JoltPhysicsObject *, ContactImpulse > m_LastContactImpulses;
+	mutable std::mutex m_LastContactImpulsesLock;
+	uint32 m_nLastImpulseTick = 0;   // Stamp used to lazily clear per-tick.
 
 	// Shadow variables
 	JoltPhysicsShadowController *m_pShadowController = nullptr;

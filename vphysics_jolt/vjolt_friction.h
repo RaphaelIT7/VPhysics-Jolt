@@ -41,5 +41,6 @@ public:
 private:
 	JoltPhysicsObject *m_pSelf = nullptr;
 	std::vector<Contact> m_contacts;
+	std::vector<JoltPhysicsObject *> m_DeleteList;
 	size_t m_index = 0;
 };

@@ -162,32 +162,111 @@ void JoltPhysicsFrictionSnapshot::GetSurfaceNormal( Vector &out )
 
 float JoltPhysicsFrictionSnapshot::GetNormalForce()
 {
-	return 0.0f;
+	if ( !IsValid() )
+		return 0.0f;
+
+	JoltPhysicsObject *pOther = m_contacts[ m_index ].pOther;
+	if ( !pOther )
+		return 0.0f;
+
+	const float flImpulse_N_s = m_pSelf->GetLastContactNormalImpulse( pOther );
+	constexpr float kAssumedStepDt = 1.0f / 60.0f;
+	const float flForce_N = flImpulse_N_s / kAssumedStepDt;
+	return JoltToSource::Distance( flForce_N );
 }
 
 float JoltPhysicsFrictionSnapshot::GetEnergyAbsorbed()
 {
-	return 0.0f;
+	if ( !IsValid() )
+		return 0.0f;
+
+	JoltPhysicsObject *pOther = m_contacts[ m_index ].pOther;
+	if ( !pOther )
+		return 0.0f;
+
+	// Already in HL energy units - the contact listener fed JoltToSource::Energy()
+	// when it accumulated this value (matches IVP's ConvertEnergyToHL of get_eliminated_energy).
+	return m_pSelf->GetLastContactFrictionEnergy( pOther );
 }
 
 //-------------------------------------------------------------------------------------------------
 
 void JoltPhysicsFrictionSnapshot::RecomputeFriction()
 {
+	// IVP calls ContactPoint::recompute_friction() which forces the contact's friction
+	// state to be re-derived from current materials. Jolt resolves friction every tick
+	// from current state already; the closest action is to wake the body so the next
+	// tick fully re-solves contacts. Wake is a no-op if already awake.
+	if ( m_pSelf )
+		m_pSelf->Wake();
 }
 
 void JoltPhysicsFrictionSnapshot::ClearFrictionForce()
 {
+	// IVP's set_friction_to_neutral resets the friction lambda accumulator on the
+	// contact. Jolt's friction lambda is rebuilt each tick from the contact's current
+	// state, so the equivalent is to drop our cached impulse for this pair and wake.
+	if ( IsValid() && m_pSelf )
+	{
+		JoltPhysicsObject *pOther = m_contacts[ m_index ].pOther;
+		if ( pOther )
+			m_pSelf->ClearContactImpulsesFor( pOther );
+		m_pSelf->Wake();
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
 
 void JoltPhysicsFrictionSnapshot::MarkContactForDelete()
 {
+	if ( !IsValid() )
+		return;
+
+	JoltPhysicsObject *pOther = m_contacts[ m_index ].pOther;
+	if ( !pOther || pOther == m_pSelf )
+		return;
+
+	// Match IVP's deferred-delete pattern: collect the other-body pointers, act on
+	// them in DeleteAllMarkedContacts.
+	m_DeleteList.push_back( pOther );
 }
 
 void JoltPhysicsFrictionSnapshot::DeleteAllMarkedContacts( bool wakeObjects )
 {
+	if ( m_DeleteList.empty() )
+		return;
+
+	// IVP's CFrictionSnapshot::DeleteAllMarkedContacts calls DeleteAllFrictionPairs
+	// (= unlink_contact_points_for_object) per other-body. Jolt manages the contact
+	// manifold cache internally and doesn't expose a per-pair invalidation, but for
+	// the use case this matters for - the physgun grabbing an object and wanting to
+	// release pre-existing contacts so the held object can move freely - clearing
+	// the cached contact impulse breaks the constraint feedback loop seen by the
+	// grab controller, and any subsequent body motion (which the physgun applies
+	// immediately via its motion controller) invalidates Jolt's body-pair cache so
+	// contacts re-detect cleanly next tick.
+	JPH::BodyInterface *pBodyInterface = nullptr;
+	if ( wakeObjects && m_pSelf )
+	{
+		pBodyInterface = &m_pSelf->GetJoltEnvironment()->GetPhysicsSystem()->GetBodyInterfaceNoLock();
+	}
+
+	for ( JoltPhysicsObject *pOther : m_DeleteList )
+	{
+		if ( !pOther )
+			continue;
+
+		m_pSelf->ClearContactImpulsesFor( pOther );
+		pOther->ClearContactImpulsesFor( m_pSelf );
+
+		if ( pBodyInterface && !pOther->IsStatic() )
+			pBodyInterface->ActivateBody( pOther->GetBodyID() );
+	}
+
+	if ( wakeObjects && m_pSelf )
+		m_pSelf->Wake();
+
+	m_DeleteList.clear();
 }
 
 //-------------------------------------------------------------------------------------------------
