@@ -35,48 +35,42 @@ static const JPH::Vec3 VehicleForwardVector	= JPH::Vec3( 0, 1, 0 );
 constexpr float MPH_TO_METERSPERSECOND = 0.44707f;
 inline float MphToGameVel( float mph ) { return mph * MPH_TO_METERSPERSECOND * JoltToSource::Factor; }
 
-#ifdef _X360
-	#define AIRBOAT_STEERING_RATE_MIN			0.000225f
-	#define AIRBOAT_STEERING_RATE_MAX			(10.0f * AIRBOAT_STEERING_RATE_MIN)
-	#define AIRBOAT_STEERING_INTERVAL			1.5f
-#else
-	#define AIRBOAT_STEERING_RATE_MIN			0.00045f
-	#define AIRBOAT_STEERING_RATE_MAX			(5.0f * AIRBOAT_STEERING_RATE_MIN)
-	#define AIRBOAT_STEERING_INTERVAL			0.5f
-#endif
+static inline constexpr float AIRBOAT_STEERING_RATE_MIN			= 0.00045f;
+static inline constexpr float AIRBOAT_STEERING_RATE_MAX			= 5.0f * AIRBOAT_STEERING_RATE_MIN;
+static inline constexpr float AIRBOAT_STEERING_INTERVAL			= 0.5f;
 
-#define AIRBOAT_ROT_DRAG					0.00004f
-#define AIRBOAT_ROT_DAMPING					0.001f
+static inline constexpr float AIRBOAT_ROT_DRAG					= 0.00004f;
+static inline constexpr float AIRBOAT_ROT_DAMPING				= 0.001f;
 
-#define AIRBOAT_THRUST_MAX					11.0f
-#define AIRBOAT_THRUST_MAX_REVERSE			7.5f
+static inline constexpr float AIRBOAT_THRUST_MAX				= 11.0f;
+static inline constexpr float AIRBOAT_THRUST_MAX_REVERSE		= 7.5f;
 
-#define AIRBOAT_WATER_DRAG_LEFT_RIGHT		0.6f
-#define AIRBOAT_WATER_DRAG_FORWARD_BACK		0.005f
-#define AIRBOAT_WATER_DRAG_UP_DOWN			0.0025f
+static inline constexpr float AIRBOAT_WATER_DRAG_LEFT_RIGHT		= 0.6f;
+static inline constexpr float AIRBOAT_WATER_DRAG_FORWARD_BACK	= 0.005f;
+static inline constexpr float AIRBOAT_WATER_DRAG_UP_DOWN		= 0.0025f;
 
-#define AIRBOAT_GROUND_DRAG_LEFT_RIGHT		2.0f
-#define AIRBOAT_GROUND_DRAG_FORWARD_BACK	1.0f
-#define AIRBOAT_GROUND_DRAG_UP_DOWN			0.8f
+static inline constexpr float AIRBOAT_GROUND_DRAG_LEFT_RIGHT	= 2.0f;
+static inline constexpr float AIRBOAT_GROUND_DRAG_FORWARD_BACK	= 1.0f;
+static inline constexpr float AIRBOAT_GROUND_DRAG_UP_DOWN		= 0.8f;
 
-#define AIRBOAT_DRY_FRICTION_SCALE			0.6f
+static inline constexpr float AIRBOAT_DRY_FRICTION_SCALE		= 0.6f;
 
-#define AIRBOAT_RAYCAST_DIST				0.35f
-#define AIRBOAT_RAYCAST_DIST_WATER_LOW		0.1f
-#define AIRBOAT_RAYCAST_DIST_WATER_HIGH		0.35f
+static inline constexpr float AIRBOAT_RAYCAST_DIST				= 0.35f;
+static inline constexpr float AIRBOAT_RAYCAST_DIST_WATER_LOW	= 0.1f;
+static inline constexpr float AIRBOAT_RAYCAST_DIST_WATER_HIGH	= 0.35f;
 
-#define AIRBOAT_WATER_NOISE_MIN				0.01f
-#define AIRBOAT_WATER_NOISE_MAX				0.03f
-#define AIRBOAT_WATER_FREQ_MIN				1.5f
-#define AIRBOAT_WATER_FREQ_MAX				1.5f
-#define AIRBOAT_WATER_PHASE_MIN				0.0f
-#define AIRBOAT_WATER_PHASE_MAX				1.5f
+static inline constexpr float AIRBOAT_WATER_NOISE_MIN			= 0.01f;
+static inline constexpr float AIRBOAT_WATER_NOISE_MAX			= 0.03f;
+static inline constexpr float AIRBOAT_WATER_FREQ_MIN			= 1.5f;
+static inline constexpr float AIRBOAT_WATER_FREQ_MAX			= 1.5f;
+static inline constexpr float AIRBOAT_WATER_PHASE_MIN			= 0.0f;
+static inline constexpr float AIRBOAT_WATER_PHASE_MAX			= 1.5f;
 
-#define AIRBOAT_GRAVITY						9.81f
+static inline constexpr float AIRBOAT_GRAVITY					= 9.81f;
 
-#define AIRBOAT_BUOYANCY_SCALAR				1.6f
-#define AIRBOAT_PONTOON_AREA_2D				2.8f
-#define AIRBOAT_PONTOON_HEIGHT				0.41f
+static inline constexpr float AIRBOAT_BUOYANCY_SCALAR			= 1.6f;
+static inline constexpr float AIRBOAT_PONTOON_AREA_2D			= 2.8f;
+static inline constexpr float AIRBOAT_PONTOON_HEIGHT			= 0.41f;
 
 static const char *VehicleTypeToName( unsigned int VehicleType )
 {
