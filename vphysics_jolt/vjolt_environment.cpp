@@ -222,9 +222,12 @@ JoltPhysicsEnvironment::JoltPhysicsEnvironment()
 	// Registering one is entirely optional.
 	m_PhysicsSystem.SetContactListener( &m_ContactListener );
 
+	// Match IVP's CIVPMaterialManager::get_friction_factor: product clamped to [0, 1].
+	// Jolt's geometric mean gives systematically higher friction than IVP for the same
+	// surfaceprop pair, which makes thrown objects stick instead of slide.
 	m_PhysicsSystem.SetCombineFriction( []( const JPH::Body &inBody1, const JPH::SubShapeID &inSubShapeID1, const JPH::Body &inBody2, const JPH::SubShapeID &inSubShapeID2 ) -> float
 	{
-		return sqrt( inBody1.GetFriction() * inBody2.GetFriction() );
+		return Clamp<float>( inBody1.GetFriction() * inBody2.GetFriction(), 0.0f, 1.0f );
 	} );
 
 	// Source's values expect them to be multiplied. Clamp the combined result to

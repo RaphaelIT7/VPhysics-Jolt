@@ -6,6 +6,8 @@
 
 #include "cbase.h"
 
+#include <optional>
+
 #include "vjolt_environment.h"
 #include "vjolt_layers.h"
 #include "vjolt_object.h"

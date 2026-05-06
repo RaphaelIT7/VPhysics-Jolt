@@ -4,6 +4,8 @@
 #include "coordsize.h"
 #include "mathlib/polyhedron.h"
 
+#include <Jolt/Core/UnorderedSet.h>
+
 #include "vjolt_parse.h"
 #include "vjolt_querymodel.h"
 
