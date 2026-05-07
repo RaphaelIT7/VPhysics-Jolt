@@ -347,7 +347,7 @@ void JoltPhysicsCollision::CollideSetOrthographicAreas( CPhysCollide *pCollide, 
 
 int JoltPhysicsCollision::CollideIndex( const CPhysCollide *pCollide )
 {
-	const JPH::Shape *shape = pCollide->ToShape();
+	[[maybe_unused]] const JPH::Shape *shape = pCollide->ToShape();
 	VJoltAssert( ( shape->GetType() == JPH::EShapeType::Convex && shape->GetSubType() == JPH::EShapeSubType::ConvexHull ) || ( shape->GetType() == JPH::EShapeType::Compound && shape->GetSubType() == JPH::EShapeSubType::StaticCompound ) );
 	const JoltCollideUserData *pData = pCollide->GetUserData();
 	return pData ? pData->vcollideIndex : 0;
@@ -701,7 +701,7 @@ namespace ivp_compat
 
 				void ReadBytes( void *outData, size_t inNumBytes ) override
 				{
-					Get( outData, inNumBytes );
+					Get( outData, static_cast<int>(inNumBytes) );
 				}
 
 				bool IsEOF() const override
@@ -861,7 +861,7 @@ int JoltPhysicsCollision::CollideWrite( char *pDest, CPhysCollide *pCollide, boo
 
 		void WriteBytes( const void *inData, size_t inNumBytes ) override
 		{
-			Put( inData, inNumBytes );
+			Put( inData, static_cast<int>(inNumBytes) );
 		}
 
 		bool IsFailed() const override
