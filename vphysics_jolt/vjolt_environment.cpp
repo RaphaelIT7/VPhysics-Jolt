@@ -18,6 +18,7 @@
 #include "vjolt_callstack.h"
 #include "vjolt_collide.h"
 #include "vjolt_constraints.h"
+#include "vjolt_controller_drag.h"
 #include "vjolt_controller_fluid.h"
 #include "vjolt_controller_motion.h"
 #include "vjolt_controller_player.h"
@@ -241,6 +242,9 @@ JoltPhysicsEnvironment::JoltPhysicsEnvironment()
 	// Set our linear cast member
 	m_bUseLinearCast = vjolt_linearcast.GetBool();
 	m_bUseEnhancedEdgeDetection = vjolt_enhanced_inactive_edge_detection.GetBool();
+
+	m_pDragController = new JoltPhysicsDragController();
+	m_PhysicsSystem.AddStepListener( m_pDragController );
 }
 
 JoltPhysicsEnvironment::~JoltPhysicsEnvironment()
@@ -258,6 +262,10 @@ JoltPhysicsEnvironment::~JoltPhysicsEnvironment()
 		JoltPhysicsObject *pObject = reinterpret_cast< JoltPhysicsObject * >( pBody->GetUserData() );
 		RemoveBodyAndDeleteObject( pObject );
 	}
+
+	m_PhysicsSystem.RemoveStepListener( m_pDragController );
+	delete m_pDragController;
+	m_pDragController = nullptr;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -299,16 +307,12 @@ void JoltPhysicsEnvironment::GetGravity( Vector *pGravityVector ) const
 
 void JoltPhysicsEnvironment::SetAirDensity( float density )
 {
-	// Josh: This is linear damping there is also angular damping...
-	// Slart: Maybe we should set both to this value
-	m_flAirDensity = density;
-	Log_Stub( LOG_VJolt );
+	m_pDragController->SetAirDensity( density );
 }
 
 float JoltPhysicsEnvironment::GetAirDensity() const
 {
-	Log_Stub( LOG_VJolt );
-	return m_flAirDensity;
+	return m_pDragController->GetAirDensity();
 }
 
 //-------------------------------------------------------------------------------------------------

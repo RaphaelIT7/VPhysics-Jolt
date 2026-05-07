@@ -258,6 +258,13 @@ public:
 	void UpdateLayer();
 	void RecomputeDrag();
 
+	// Air-drag basis helpers, used by JoltPhysicsDragController and the public
+	// Calculate*Drag APIs. Linear takes WORLD-space velocity (transforms
+	// world->local internally); angular takes LOCAL-space angular velocity.
+	// Mirrors IVP's CPhysicsObject::GetDragInDirection / GetAngularDragInDirection.
+	float GetDragInDirection( JPH::Vec3Arg vWorldVelocity ) const;
+	float GetAngularDragInDirection( JPH::Vec3Arg vLocalAngularVelocity ) const;
+
 	// Should be called BEFORE UpdateLayer inside EnableMotion!
 	void RecaulculateFixedConstraintPartnerMovable();
 private:
@@ -295,6 +302,11 @@ private:
 	bool m_bDragEnabled = false;
 	float m_flLinearDragCoefficient = 0.0f;
 	float m_flAngularDragCoefficient = 0.0f;
+	// Per-axis local-space drag bases, computed from the AABB cross-sections.
+	// Linear basis has units m^2/kg; angular basis m^3/kg. Recomputed by
+	// RecomputeDrag() on init / mass change.
+	JPH::Vec3 m_vDragBasis = JPH::Vec3::sZero();
+	JPH::Vec3 m_vAngDragBasis = JPH::Vec3::sZero();
 
 	float m_flMaterialDensity = 1.0f; // Material density in Jolt space.
 	float m_flBuoyancyRatio = 0.0f;

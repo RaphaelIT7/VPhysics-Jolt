@@ -14,6 +14,7 @@
 class JoltBroadPhaseLayerInterface;
 class JoltObjectVsBroadPhaseLayerFilter;
 class JoltObjectLayerPairFilter;
+class JoltPhysicsDragController;
 
 // StateRecorder implementation that saves to a fixed buffer
 class VJoltStateRecorder final : public JPH::StateRecorder, public CUtlBuffer
@@ -179,6 +180,8 @@ public:
 public:
 	JPH::PhysicsSystem* GetPhysicsSystem() { return &m_PhysicsSystem; }
 
+	JoltPhysicsDragController* GetDragController() { return m_pDragController; }
+
 	void ObjectTransferHandOver( JoltPhysicsObject* pObject );
 
 	JoltPhysicsContactListener* GetContactListener() { return &m_ContactListener; }
@@ -219,7 +222,9 @@ private:
 	bool m_bUseLinearCast = true;
 	bool m_bUseEnhancedEdgeDetection = true;
 	float m_flStepTime = 1.0f / 60.0f;
-	float m_flAirDensity = 2.0f;
+
+	// Owned. Also stored in m_pPhysicsControllers so OnPreSimulate is called.
+	JoltPhysicsDragController* m_pDragController = nullptr;
 
 	static JoltBroadPhaseLayerInterface s_BroadPhaseLayerInterface;
 	static JoltObjectVsBroadPhaseLayerFilter s_BroadPhaseFilter;

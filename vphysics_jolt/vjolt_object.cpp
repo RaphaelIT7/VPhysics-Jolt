@@ -1,4 +1,4 @@
-﻿//=================================================================================================
+//=================================================================================================
 //
 // A physics object, implemented as a wrapper over JPH::Body
 // Every tangible object in the game has one of these
@@ -13,6 +13,7 @@
 #include "vjolt_environment.h"
 #include "vjolt_layers.h"
 #include "vjolt_listener_contact.h"
+#include "vjolt_controller_drag.h"
 #include "vjolt_controller_shadow.h"
 
 #include "vjolt_object.h"
@@ -86,6 +87,8 @@ JoltPhysicsObject::JoltPhysicsObject( JPH::Body *pBody, JoltPhysicsEnvironment *
 	{
 		GetVelocity( &m_vLastVelocity, &m_vLastAngularVelocity );
 		GetPosition( &m_vLastPosition, &m_qLastOrientation );
+
+		RecomputeDrag();
 
 		if ( pParams->dragCoefficient != 0.0f )
 		{
@@ -256,8 +259,13 @@ void JoltPhysicsObject::EnableDrag( bool enable )
 	if ( m_bDragEnabled == enable )
 		return;
 
-	Log_Stub( LOG_VJolt );
-	m_bDragEnabled = true;
+	m_bDragEnabled = enable;
+
+	JoltPhysicsDragController *pDragController = m_pEnvironment->GetDragController();
+	if ( enable )
+		pDragController->RegisterObject( this );
+	else
+		pDragController->UnregisterObject( this );
 }
 
 void JoltPhysicsObject::EnableMotion( bool enable )
@@ -380,6 +388,7 @@ void JoltPhysicsObject::SetMass( float mass )
 		pMotionProperties->SetMassProperties( JPH::EAllowedDOFs::All, massProperties );
 
 		CalculateBuoyancy();
+		RecomputeDrag();
 	}
 }
 
@@ -836,14 +845,13 @@ void JoltPhysicsObject::CalculateVelocityOffset( const Vector &forceVector, cons
 
 float JoltPhysicsObject::CalculateLinearDrag( const Vector &unitDirection ) const
 {
-	Log_Stub( LOG_VJolt );
-	return 0.0f;
+	return GetDragInDirection( SourceToJolt::Unitless( unitDirection ) );
 }
 
 float JoltPhysicsObject::CalculateAngularDrag( const Vector &objectSpaceRotationAxis ) const
 {
-	Log_Stub( LOG_VJolt );
-	return 0.0f;
+	// Drag factor is per-radian internally; Source 1 callers expect per-degree.
+	return GetAngularDragInDirection( SourceToJolt::Unitless( objectSpaceRotationAxis ) ) * DEG2RAD( 1.0f );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1618,13 +1626,76 @@ void JoltPhysicsObject::UpdateLayer()
 	bodyInterface.SetObjectLayer( m_pBody->GetID(), layer );
 }
 
+// Integral of each differential drag area's torque over the OBB along one face pair.
+// l, w, h are HALF widths -- l along the rotation axis, w perpendicular in the face
+// plane, h perpendicular to the face. Sum two such integrals (one per face pair) to
+// get the basis for one rotation axis.
+static float AngDragIntegral( float flInvInertia, float l, float w, float h )
+{
+	const float w2 = w * w;
+	const float l2 = l * l;
+	const float h2 = h * h;
+
+	return flInvInertia * ( ( 1.0f / 3.0f ) * w2 * l * l2 + 0.5f * w2 * w2 * l + l * w2 * h2 );
+}
+
 void JoltPhysicsObject::RecomputeDrag()
 {
-	if ( IsStatic() )
+	if ( IsStatic() || !GetCollide() )
 		return;
 
+	// AABB cross-section areas in Source space; convert delta to Jolt space (m).
 	Vector vDragMins, vDragMaxs;
 	JoltPhysicsCollision::GetInstance().CollideGetAABB( &vDragMins, &vDragMaxs, GetCollide(), vec3_origin, vec3_angle );
+
+	// CollideGetOrthographicAreas is currently a stub returning vec3_origin -- treat
+	// missing data as (1,1,1), i.e. assume the AABB is fully filled.
+	Vector vAreaFractions = JoltPhysicsCollision::GetInstance().CollideGetOrthographicAreas( GetCollide() );
+	if ( vAreaFractions == vec3_origin )
+		vAreaFractions.Init( 1.0f, 1.0f, 1.0f );
+
+	JPH::Vec3 vDelta = SourceToJolt::Distance( vDragMaxs - vDragMins ).Abs();
+
+	const float flInvMass = m_flCachedInvMass;
+
+	// Linear basis: each component is the area of the face perpendicular to that axis,
+	// scaled by inverse mass. Units: m^2/kg.
+	m_vDragBasis = JPH::Vec3(
+		vDelta.GetY() * vDelta.GetZ() * vAreaFractions.x,
+		vDelta.GetX() * vDelta.GetZ() * vAreaFractions.y,
+		vDelta.GetX() * vDelta.GetY() * vAreaFractions.z ) * flInvMass;
+
+	// Angular basis needs HALF widths.
+	vDelta *= 0.5f;
+	const JPH::Vec3 vInvInertia = m_pBody->GetMotionProperties()->GetInverseInertiaDiagonal();
+
+	m_vAngDragBasis = JPH::Vec3(
+		vAreaFractions.z * AngDragIntegral( vInvInertia.GetX(), vDelta.GetX(), vDelta.GetY(), vDelta.GetZ() )
+			+ vAreaFractions.y * AngDragIntegral( vInvInertia.GetX(), vDelta.GetX(), vDelta.GetZ(), vDelta.GetY() ),
+		vAreaFractions.z * AngDragIntegral( vInvInertia.GetY(), vDelta.GetY(), vDelta.GetX(), vDelta.GetZ() )
+			+ vAreaFractions.x * AngDragIntegral( vInvInertia.GetY(), vDelta.GetY(), vDelta.GetZ(), vDelta.GetX() ),
+		vAreaFractions.y * AngDragIntegral( vInvInertia.GetZ(), vDelta.GetZ(), vDelta.GetX(), vDelta.GetY() )
+			+ vAreaFractions.x * AngDragIntegral( vInvInertia.GetZ(), vDelta.GetZ(), vDelta.GetY(), vDelta.GetX() ) );
+}
+
+float JoltPhysicsObject::GetDragInDirection( JPH::Vec3Arg vWorldVelocity ) const
+{
+	// Transform the world-space velocity into the body's local frame, then dot with
+	// the local-space drag basis. Mirrors IVP's m_world_f_core->vimult3.
+	const JPH::Vec3 vLocal = m_pBody->GetRotation().Conjugated() * vWorldVelocity;
+
+	// NB: operator-precedence matches IVP/Source -- the linear coefficient applies
+	// only to the X term. Preserved verbatim to match upstream drag intensity.
+	return m_flLinearDragCoefficient * fabsf( vLocal.GetX() * m_vDragBasis.GetX() )
+		+ fabsf( vLocal.GetY() * m_vDragBasis.GetY() )
+		+ fabsf( vLocal.GetZ() * m_vDragBasis.GetZ() );
+}
+
+float JoltPhysicsObject::GetAngularDragInDirection( JPH::Vec3Arg vLocalAngularVelocity ) const
+{
+	return m_flAngularDragCoefficient * fabsf( vLocalAngularVelocity.GetX() * m_vAngDragBasis.GetX() )
+		+ fabsf( vLocalAngularVelocity.GetY() * m_vAngDragBasis.GetY() )
+		+ fabsf( vLocalAngularVelocity.GetZ() * m_vAngDragBasis.GetZ() );
 }
 
 #if GAME_GMOD
