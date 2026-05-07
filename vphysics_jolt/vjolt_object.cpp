@@ -1644,15 +1644,13 @@ void JoltPhysicsObject::RecomputeDrag()
 	if ( IsStatic() || !GetCollide() )
 		return;
 
-	// AABB cross-section areas in Source space; convert delta to Jolt space (m).
+	// AABB in Source space; convert delta to Jolt space (m). Area fractions are unitless,
+	// in [0,1], populated from compactsurfaceheader_t::dragAxisAreas at .phy load time.
+	// CollideGetOrthographicAreas guarantees (1,1,1) when no precomputed value exists.
 	Vector vDragMins, vDragMaxs;
 	JoltPhysicsCollision::GetInstance().CollideGetAABB( &vDragMins, &vDragMaxs, GetCollide(), vec3_origin, vec3_angle );
 
-	// CollideGetOrthographicAreas is currently a stub returning vec3_origin -- treat
-	// missing data as (1,1,1), i.e. assume the AABB is fully filled.
-	Vector vAreaFractions = JoltPhysicsCollision::GetInstance().CollideGetOrthographicAreas( GetCollide() );
-	if ( vAreaFractions == vec3_origin )
-		vAreaFractions.Init( 1.0f, 1.0f, 1.0f );
+	const Vector vAreaFractions = JoltPhysicsCollision::GetInstance().CollideGetOrthographicAreas( GetCollide() );
 
 	JPH::Vec3 vDelta = SourceToJolt::Distance( vDragMaxs - vDragMins ).Abs();
 

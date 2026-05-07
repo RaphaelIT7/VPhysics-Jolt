@@ -21,6 +21,16 @@
 namespace VJoltTrace
 {
 
+// Read the gameData (engine contents flag) for the sub-shape hit by a trace.
+// JPH::Shape::GetSubShapeUserData returns the raw uint64 stored on the sub-shape,
+// which is a pointer to JoltCollideUserData in our scheme. Returns 0 if absent.
+static uint32 GetSubShapeGameData( const JPH::Shape *pShape, JPH::SubShapeID id )
+{
+	const auto *pData = reinterpret_cast<const JoltCollideUserData *>( pShape->GetSubShapeUserData( id ) );
+	return pData ? static_cast<uint32>( pData->gameData ) : 0;
+}
+
+
 static ConVar vjolt_trace_debug( "vjolt_trace_debug", "0", FCVAR_CHEAT );
 static ConVar vjolt_trace_debug_castray( "vjolt_trace_debug_castray", "0", FCVAR_CHEAT );
 static ConVar vjolt_trace_debug_collidepoint( "vjolt_trace_debug_collidepoint", "0", FCVAR_CHEAT );
@@ -89,7 +99,7 @@ public:
 		const float ourEarlyOut = GetEarlyOutFraction();
 		if ( !m_DidHit || theirEarlyOut < ourEarlyOut )
 		{
-			const uint32 gameData = static_cast<uint32>( m_pShape->GetSubShapeUserData( inResult.mSubShapeID2 ) );
+			const uint32 gameData = GetSubShapeGameData( m_pShape, inResult.mSubShapeID2 );
 			const uint32 contents = m_pConvexInfo ? m_pConvexInfo->GetContents( gameData ) : CONTENTS_SOLID;
 
 			if ( contents & m_ContentsMask )
@@ -138,7 +148,7 @@ public:
 		if ( m_DidHit )
 			return;
 
-		const uint32 gameData = static_cast<uint32>( m_pShape->GetSubShapeUserData( inResult.mSubShapeID2 ) );
+		const uint32 gameData = GetSubShapeGameData( m_pShape, inResult.mSubShapeID2 );
 		const uint32 contents = m_pConvexInfo ? m_pConvexInfo->GetContents( gameData ) : CONTENTS_SOLID;
 
 		if ( contents & m_ContentsMask )
@@ -177,7 +187,7 @@ public:
 
 	bool ShouldCollide( const JPH::Shape *inShape2, const JPH::SubShapeID& inSubShapeID2 ) const override
 	{
-		const uint32 gameData = static_cast<uint32>( inShape2->GetSubShapeUserData( inSubShapeID2 ) );
+		const uint32 gameData = GetSubShapeGameData( inShape2, inSubShapeID2 );
 		const uint32 contents = m_pConvexInfo ? m_pConvexInfo->GetContents( gameData ) : CONTENTS_SOLID;
 
 		return !!( contents & m_ContentsMask );
@@ -207,7 +217,7 @@ public:
 
 	void AddHit( const JPH::ShapeCastResult &inResult ) override
 	{
-		const uint32 gameData = static_cast<uint32>( m_pShape->GetSubShapeUserData( inResult.mSubShapeID2 ) );
+		const uint32 gameData = GetSubShapeGameData( m_pShape, inResult.mSubShapeID2 );
 		const uint32 contents = m_pConvexInfo ? m_pConvexInfo->GetContents( gameData ) : CONTENTS_SOLID;
 
 		// Ensure that the contents filter was used
@@ -299,7 +309,7 @@ public:
 	void AddHit( const JPH::CollideShapeResult &inResult ) override
 	{
 		// Get the contents of the subshape that we hit
-		const uint32 gameData = static_cast<uint32>( m_pShape->GetSubShapeUserData( inResult.mSubShapeID2 ) );
+		const uint32 gameData = GetSubShapeGameData( m_pShape, inResult.mSubShapeID2 );
 		const uint32 contents = m_pConvexInfo ? m_pConvexInfo->GetContents( gameData ) : CONTENTS_SOLID;
 
 		VJoltAssert( contents & m_ContentsMask );

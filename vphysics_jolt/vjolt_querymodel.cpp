@@ -1,6 +1,7 @@
 
 #include "cbase.h"
 
+#include "vjolt_collide.h"
 #include "vjolt_querymodel.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -38,7 +39,8 @@ int JoltCollisionQuery::TriangleCount( int convexIndex )
 
 unsigned int JoltCollisionQuery::GetGameData( int convexIndex )
 {
-	return static_cast< unsigned int >( m_pShape->GetUserData() );
+	const auto *pData = reinterpret_cast<const JoltCollideUserData *>( m_pShape->GetUserData() );
+	return pData ? static_cast<unsigned int>( pData->gameData ) : 0;
 }
 
 //-------------------------------------------------------------------------------------------------

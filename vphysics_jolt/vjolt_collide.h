@@ -12,8 +12,16 @@
 
 static constexpr float kMaxConvexRadius = SourceToJolt::Distance( DIST_EPSILON * 2.0f );
 
-// Dummy helper class to go back and forth.
-// Does not and will not contain *any* data.
+// Per-shape state stashed via JPH::Shape::mUserData (as a pointer-cast).
+struct JoltCollideUserData
+{
+	Vector orthographicAreas { 1.0f, 1.0f, 1.0f };
+	int    vcollideIndex     = 0;
+	int    gameData          = 0;
+};
+
+// Dummy helper class to go back and forth between CPhysCollide* and JPH::Shape*. The
+// only "data" on the shape we own is the JoltCollideUserData* in its UserData slot.
 class CPhysCollide
 {
 	~CPhysCollide() = delete;
@@ -40,12 +48,28 @@ public:
 	{
 		return reinterpret_cast< const CPhysCollide * >( pCollide );
 	}
+
+	//-------------------------------------------------------------------------------------------------
+
+	JoltCollideUserData *GetUserData()
+	{
+		return reinterpret_cast<JoltCollideUserData *>( ToShape()->GetUserData() );
+	}
+
+	const JoltCollideUserData *GetUserData() const
+	{
+		return reinterpret_cast<const JoltCollideUserData *>( ToShape()->GetUserData() );
+	}
+
+	void SetUserData( JoltCollideUserData *pData )
+	{
+		ToShape()->SetUserData( reinterpret_cast<uint64>( pData ) );
+	}
 };
 
 //-------------------------------------------------------------------------------------------------
 
-// Dummy helper class to go back and forth.
-// Does not and will not contain *any* data.
+// Dummy helper class to go back and forth between CPhysConvex* and JPH::ConvexShape*.
 class CPhysConvex
 {
 	~CPhysConvex() = delete;
@@ -78,6 +102,21 @@ public:
 	CPhysCollide *ToPhysCollide()
 	{
 		return reinterpret_cast< CPhysCollide * >( this );
+	}
+
+	JoltCollideUserData *GetUserData()
+	{
+		return reinterpret_cast<JoltCollideUserData *>( ToConvexShape()->GetUserData() );
+	}
+
+	const JoltCollideUserData *GetUserData() const
+	{
+		return reinterpret_cast<const JoltCollideUserData *>( ToConvexShape()->GetUserData() );
+	}
+
+	void SetUserData( JoltCollideUserData *pData )
+	{
+		ToConvexShape()->SetUserData( reinterpret_cast<uint64>( pData ) );
 	}
 };
 

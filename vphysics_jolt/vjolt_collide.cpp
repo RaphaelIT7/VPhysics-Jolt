@@ -21,7 +21,10 @@ EXPOSE_SINGLE_INTERFACE_GLOBALVAR( JoltPhysicsCollision, IPhysicsCollision, VPHY
 
 //-------------------------------------------------------------------------------------------------
 
-// Creates a shape from shape settings, resolving the reference
+// Creates a shape from shape settings, resolving the reference. Every shape created
+// via this helper carries a freshly-allocated JoltCollideUserData* in its UserData
+// slot; freed in DestroyCollide. Sub-shapes inside compounds also go through here,
+// so each gets its own struct (per-ledge gameData is set after the call).
 template < typename ShapeType, typename T >
 ShapeType *ShapeSettingsToShape( const T& settings )
 {
@@ -33,12 +36,14 @@ ShapeType *ShapeSettingsToShape( const T& settings )
 		const char *error = result.HasError()
 			? result.GetError().c_str()
 			: "Unknown";
- 
+
 		Log_Warning( LOG_VJolt, "Failed to create shape: %s.\n", error );
 		return nullptr;
 	}
 
-	return static_cast< ShapeType * >( ToDanglingRef( result.Get() ) );
+	auto *pShape = static_cast< ShapeType * >( ToDanglingRef( result.Get() ) );
+	pShape->SetUserData( reinterpret_cast<uint64>( new JoltCollideUserData() ) );
+	return pShape;
 }
 
 // Creates a JPH::ConvexShape from shape settings, and casts to a CPhysConvex
@@ -119,9 +124,9 @@ float JoltPhysicsCollision::ConvexSurfaceArea( CPhysConvex *pConvex )
 
 void JoltPhysicsCollision::SetConvexGameData( CPhysConvex *pConvex, unsigned int gameData )
 {
-	JPH::Shape *shape = pConvex->ToConvexShape();
-	const uint64 upper = shape->GetUserData() & 0xFFFFFFFF00000000;
-	shape->SetUserData( gameData | upper );
+	JoltCollideUserData *pData = pConvex->GetUserData();
+	if ( pData )
+		pData->gameData = static_cast<int>( gameData );
 }
 
 void JoltPhysicsCollision::ConvexFree( CPhysConvex *pConvex )
@@ -222,7 +227,22 @@ void JoltPhysicsCollision::DestroyCollide( CPhysCollide *pCollide )
 	if ( !pCollide )
 		return;
 
-	pCollide->ToShape()->Release();
+	JPH::Shape *pShape = pCollide->ToShape();
+
+	// Compound shapes own their sub-shapes via Jolt refs; we own each sub-shape's
+	// JoltCollideUserData. Walk + free those before releasing the compound.
+	if ( pShape->GetType() == JPH::EShapeType::Compound )
+	{
+		const JPH::CompoundShape *pCompound = static_cast<const JPH::CompoundShape *>( pShape );
+		for ( uint i = 0; i < pCompound->GetNumSubShapes(); i++ )
+		{
+			const JPH::Shape *pSubShape = pCompound->GetSubShape( i ).mShape.GetPtr();
+			delete reinterpret_cast<JoltCollideUserData *>( pSubShape->GetUserData() );
+		}
+	}
+
+	delete reinterpret_cast<JoltCollideUserData *>( pShape->GetUserData() );
+	pShape->Release();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -304,15 +324,23 @@ void JoltPhysicsCollision::CollideSetMassCenter( CPhysCollide *pCollide, const V
 
 Vector JoltPhysicsCollision::CollideGetOrthographicAreas( const CPhysCollide *pCollide )
 {
-	// Slart: Only used in studiomdl... In a part that is #if 0'd out...
-	Log_Stub( LOG_VJolt );
-	return vec3_origin;
+	// Per IPhysicsCollision contract: returns 1,1,1 if not precomputed. The IVP
+	// deserializer fills this in from compactsurfaceheader_t::dragAxisAreas.
+	if ( !pCollide )
+		return Vector( 1.0f, 1.0f, 1.0f );
+
+	const JoltCollideUserData *pData = pCollide->GetUserData();
+	return pData ? pData->orthographicAreas : Vector( 1.0f, 1.0f, 1.0f );
 }
 
 void JoltPhysicsCollision::CollideSetOrthographicAreas( CPhysCollide *pCollide, const Vector &areas )
 {
-	// Slart: Never used
-	Log_Stub( LOG_VJolt );
+	if ( !pCollide )
+		return;
+
+	JoltCollideUserData *pData = pCollide->GetUserData();
+	if ( pData )
+		pData->orthographicAreas = areas;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -321,7 +349,8 @@ int JoltPhysicsCollision::CollideIndex( const CPhysCollide *pCollide )
 {
 	const JPH::Shape *shape = pCollide->ToShape();
 	VJoltAssert( ( shape->GetType() == JPH::EShapeType::Convex && shape->GetSubType() == JPH::EShapeSubType::ConvexHull ) || ( shape->GetType() == JPH::EShapeType::Compound && shape->GetSubType() == JPH::EShapeSubType::StaticCompound ) );
-	return static_cast<int>( shape->GetUserData() >> 32 );
+	const JoltCollideUserData *pData = pCollide->GetUserData();
+	return pData ? pData->vcollideIndex : 0;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -509,7 +538,7 @@ namespace ivp_compat
 		COLLIDE_VIRTUAL = 3,
 	};
 
-	JPH::ConvexShape *IVPLedgeToConvexShape( const compactledge_t *pLedge, uint64 userData )
+	JPH::ConvexShape *IVPLedgeToConvexShape( const compactledge_t *pLedge, int vcollideIndex )
 	{
 		if ( !pLedge->n_triangles )
 			return nullptr;
@@ -555,7 +584,12 @@ namespace ivp_compat
 			}
 		}
 		
-		pConvexShape->SetUserData( pLedge->client_data | userData );
+		// Per-ledge gameData is the IVP client_data (engine contents flag).
+		// vcollideIndex is propagated from the parent solid.
+		JoltCollideUserData *pData = CPhysCollide::FromShape( pConvexShape )->GetUserData();
+		pData->gameData = static_cast<int>( pLedge->client_data );
+		pData->vcollideIndex = vcollideIndex;
+
 		return pConvexShape;
 	}
 
@@ -573,7 +607,7 @@ namespace ivp_compat
 			vecOut.AddToTail( pNode->GetCompactLedge() );
 	}
 
-	CPhysCollide *DeserializeIVP_Poly( const compactsurface_t* pSurface, uint64 userData )
+	CPhysCollide *DeserializeIVP_Poly( const compactsurface_t* pSurface, int vcollideIndex )
 	{
 		const compactledgenode_t *pFirstLedgeNode = reinterpret_cast< const compactledgenode_t * >(
 				reinterpret_cast< const char * >( pSurface ) + pSurface->offset_ledgetree_root );
@@ -589,7 +623,7 @@ namespace ivp_compat
 			// One compound convex per ledge.
 			for ( int i = 0; i < ledges.Count(); i++ )
 			{
-				const JPH::Shape* pShape = IVPLedgeToConvexShape( ledges[i], userData );
+				const JPH::Shape* pShape = IVPLedgeToConvexShape( ledges[i], vcollideIndex );
 				// Josh:
 				// Some models have degenerate convexes which fails to make
 				// a subshape in Jolt, so we need to ignore those ledges.
@@ -597,28 +631,35 @@ namespace ivp_compat
 					settings.AddShape( JPH::Vec3::sZero(), JPH::Quat::sIdentity(), pShape );
 			}
 			JPH::Shape *shape = ShapeSettingsToShape<JPH::Shape>( settings );
-			shape->SetUserData( userData );
-			return CPhysCollide::FromShape( shape );
+			CPhysCollide *pCollide = CPhysCollide::FromShape( shape );
+			pCollide->GetUserData()->vcollideIndex = vcollideIndex;
+			return pCollide;
 		}
 		else
 		{
-			JPH::ConvexShape *pShape = IVPLedgeToConvexShape( ledges[ 0 ], userData );
+			// Single-ledge solid: the convex IS the root. Its UserData (already
+			// allocated by IVPLedgeToConvexShape) carries both per-ledge gameData
+			// and the propagated vcollideIndex -- nothing more to set here.
+			JPH::ConvexShape *pShape = IVPLedgeToConvexShape( ledges[ 0 ], vcollideIndex );
 			return CPhysCollide::FromShape( pShape );
 		}
 	}
 
-	CPhysCollide *DeserializeIVP_Poly( const collideheader_t *pCollideHeader, uint64 userData )
+	CPhysCollide *DeserializeIVP_Poly( const collideheader_t *pCollideHeader, int vcollideIndex )
 	{
 		const compactsurfaceheader_t *pSurfaceHeader = reinterpret_cast< const compactsurfaceheader_t* >( pCollideHeader + 1 );
 		const compactsurface_t *pSurface = reinterpret_cast< const compactsurface_t* >( pSurfaceHeader + 1 );
 
-		return DeserializeIVP_Poly( pSurface, userData );
+		CPhysCollide *pCollide = DeserializeIVP_Poly( pSurface, vcollideIndex );
+		if ( pCollide )
+			pCollide->GetUserData()->orthographicAreas = pSurfaceHeader->dragAxisAreas;
+		return pCollide;
 	}
 
 	CPhysCollide *Deserialize( const char *pCursor, int solidSize, unsigned int i )
 	{
 		const collideheader_t *pCollideHeader = reinterpret_cast<const collideheader_t *>( pCursor );
-		uint64 userData = static_cast<uint64>( i ) << 32ULL;
+		const int vcollideIndex = static_cast<int>( i );
 
 		if ( pCollideHeader->vphysicsID == VPHYSICS_COLLISION_ID )
 		{
@@ -631,7 +672,7 @@ namespace ivp_compat
 			switch ( pCollideHeader->modelType )
 			{
 				case COLLIDE_POLY:
-					return DeserializeIVP_Poly( pCollideHeader, userData );
+					return DeserializeIVP_Poly( pCollideHeader, vcollideIndex );
 					break;
 
 				case COLLIDE_MOPP:
@@ -693,7 +734,13 @@ namespace ivp_compat
 				subShapes.emplace_back( subShape.Get() );
 			}
 			shape.Get()->RestoreSubShapeState( subShapes.data(), subShapeCount );
-			return CPhysCollide::FromShape( ToDanglingRef( shape.Get() ) );
+			JPH::Shape *pRestoredShape = ToDanglingRef( shape.Get() );
+			// Restored Jolt-native shapes don't go through ShapeSettingsToShape, so
+			// allocate the JoltCollideUserData manually to keep the invariant.
+			auto *pData = new JoltCollideUserData();
+			pData->vcollideIndex = vcollideIndex;
+			pRestoredShape->SetUserData( reinterpret_cast<uint64>( pData ) );
+			return CPhysCollide::FromShape( pRestoredShape );
 		}
 		else
 		{
@@ -708,7 +755,7 @@ namespace ivp_compat
 				case IVP_COMPACT_SURFACE_SUPER_LEGACY:
 				case IVP_COMPACT_SURFACE_ID:
 				case IVP_COMPACT_SURFACE_ID_SWAPPED:
-					return DeserializeIVP_Poly( pCompactSurface, userData );
+					return DeserializeIVP_Poly( pCompactSurface, vcollideIndex );
 					break;
 
 				case IVP_COMPACT_MOPP_ID:
@@ -1091,5 +1138,14 @@ const JPH::Shape *CreateCOMOverrideShape( const JPH::Shape* pShape, JPH::Vec3Arg
 		return pShape;
 
 	JPH::OffsetCenterOfMassShapeSettings settings( comOffset, pShape );
-	return ShapeSettingsToShape< JPH::OffsetCenterOfMassShape >( settings );
+	JPH::OffsetCenterOfMassShape *pWrapper = ShapeSettingsToShape< JPH::OffsetCenterOfMassShape >( settings );
+
+	// ShapeSettingsToShape allocated a fresh JoltCollideUserData on the wrapper. Throw
+	// it away and forward the inner shape's pointer instead -- the inner is the owner;
+	// DestroyCollide on the inner frees it. The wrapper is a non-owning view so callers
+	// can do CPhysCollide::FromShape(wrapper)->GetUserData() and see the .phy data.
+	delete reinterpret_cast<JoltCollideUserData *>( pWrapper->GetUserData() );
+	pWrapper->SetUserData( pShape->GetUserData() );
+
+	return pWrapper;
 }
