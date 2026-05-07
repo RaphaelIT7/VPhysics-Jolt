@@ -1090,7 +1090,7 @@ void JoltPhysicsObject::ClampShadowVelocityAgainstContacts( JPH::Vec3 &ioVelocit
 				return false;
 			// Only clamp against static world geometry. Clamping against dynamic
 			// bodies would block lifting an object that has stuff on top of it.
-			return inBody.IsStatic();
+			return inBody.IsStatic() && !inBody.IsSensor();
 		}
 	private:
 		const JoltPhysicsObject *m_pSelf;
