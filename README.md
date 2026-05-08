@@ -33,7 +33,7 @@ It is not meant to be a bash on anyone elses work however, the Bullet VPhysics p
 | Fluid events                                                  | ✔️ | ✔️ | ❌ |
 | Prop splashing effects                                        | ✔️ | ✔️ | ❌ |
 | Wheeled Vehicles                                              | ✔️ | ✔️ | ✔️ |
-| Raycast Vehicles (ie. Airboat)                                | ✔️ | ❌ | 〰️ (janky) |
+| Raycast Vehicles (ie. Airboat)                                | ✔️ | 〰️ (Airboat implemented) | 〰️ (janky) |
 | NPCs/Doors (Shadow Controllers)                               | ✔️ | ✔️ | ✔️ |
 | Save/Restore Support                                          | ✔️ | ✔️ | ❌ |
 | Portal Support                                                | ✔️ | ✔️ | ❌ |
