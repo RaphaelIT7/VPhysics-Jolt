@@ -27,6 +27,7 @@ static const int MAX_LOGGING_MESSAGE_LENGTH = 2048;
 #undef InternalMsg
 #endif
 
+#ifndef NEWER_SOURCESDK
 struct LoggingChannelInfo_t
 {
 	const char *pszName;
@@ -38,15 +39,18 @@ struct LoggingChannelInfo_t
 #define DECLARE_LOGGING_CHANNEL( Channel ) extern LoggingChannelInfo_t g_LoggingInfo##Channel;
 
 #define DEFINE_LOGGING_CHANNEL_NO_TAGS( Channel, ChannelName, ...  ) LoggingChannelInfo_t g_LoggingInfo##Channel = { ChannelName, __VA_ARGS__ };
+#endif
 
 // TODO
 #define DevAssert( ... )
 #define DevAssertMsg( ... )
 #define AssertMsg_Internal( ... )
 #define InternalMsg( Channel, Fmt, ... ) ConColorMsg( g_LoggingInfo##Channel.color, "[%s]" Fmt, g_LoggingInfo##Channel.pszName, ##__VA_ARGS__ )
+#ifndef NEWER_SOURCESDK
 #define Log_Msg( Channel, Fmt, ... ) InternalMsg( Channel, Fmt, ##__VA_ARGS__ )
 #define Log_Warning( Channel, Fmt, ... ) InternalMsg( Channel, Fmt, ##__VA_ARGS__ )
 #define Log_Error( Channel, Fmt, ... ) InternalMsg( Channel, Fmt, ##__VA_ARGS__ )
+#endif
 
 // Unused, just makes stuff cleaner to not have ifdef spam.
 #if !defined( GAME_GMOD_64X )

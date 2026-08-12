@@ -49,7 +49,7 @@
 #define override_not_asw override
 #endif
 
-#ifndef GAME_VITAMIN
+#if !defined( GAME_VITAMIN ) && !defined( NEWER_SOURCESDK )
 using strlen_t = int;
 #endif
 
